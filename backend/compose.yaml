@@ -24,15 +24,26 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       DB_URL: jdbc:mysql://mysql:3306/vira?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: vira_app
       DB_PASSWORD: vira_app_dev
       JWT_SECRET: change-this-production-jwt-secret-before-deploying-at-least-32-bytes
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
     ports:
       - "8080:8080"
     volumes:
       - ./uploads:/app/uploads
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: vira-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
 volumes:
   vira_mysql_data:

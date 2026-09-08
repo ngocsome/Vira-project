@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap");
 :root {
   --primary: #2563eb;
   --ink: #172033;
@@ -114,7 +114,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font:
-    14px/1.55 "Plus Jakarta Sans",
+    14px/1.55 "Be Vietnam Pro",
+    "Noto Sans",
     sans-serif;
 }
 button,
@@ -268,11 +269,23 @@ input:focus-visible {
   border-radius: 50%;
   width: 34px;
   height: 34px;
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
   font-size: 11px;
+  line-height: 1;
   font-weight: 800;
+  text-indent: 0;
   flex: none;
+}
+.avatar-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
 }
 .avatar.small {
   width: 25px;
@@ -1334,7 +1347,8 @@ main {
 }
 body {
   font:
-    var(--text-sm)/1.6 "Plus Jakarta Sans",
+    var(--text-sm)/1.6 "Be Vietnam Pro",
+    "Noto Sans",
     sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -1423,6 +1437,70 @@ body {
   font-size: var(--text-xl);
   line-height: 1.35;
 }
+.task-collaboration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -8px 0 20px;
+}
+.task-participants {
+  display: grid;
+  gap: 8px;
+}
+.task-participants > span {
+  font-size: 10px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 0;
+}
+.participant-list {
+  display: grid;
+  gap: 6px;
+}
+.participant-list.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.participant {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 7px;
+  font-size: 11px;
+}
+.participant b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.participant-list p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.participant-picker {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+.participant-picker summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 700;
+}
+.participant-picker label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0 0;
+  color: var(--ink);
+  cursor: pointer;
+}
+.participant-picker input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+}
 .description h3 {
   font-size: var(--text-sm);
 }
@@ -1464,9 +1542,11 @@ body {
 /* Sidebar profile: use a fixed visual rhythm so avatar, text and overflow action share one center line. */
 .user-card {
   min-height: 58px;
-  padding: 10px 8px;
+  /* Match the 11px inset used by the two sidebar action rows above. */
+  padding: 10px 11px;
   gap: 10px;
   align-items: center;
+  margin-top: 8px;
 }
 .user-card > .avatar {
   flex: 0 0 34px;
@@ -1481,16 +1561,30 @@ body {
   font-size: 13px;
   line-height: 1.25;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .user-card span {
   font-size: 11px;
   line-height: 1.25;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.user-card > svg {
-  flex: 0 0 22px;
+.user-card > button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
   margin-left: auto;
-  align-self: center;
+  padding: 0;
+  border-radius: 9px;
+  color: #526178;
+}
+.user-card > button:hover {
+  background: #f2f6fc;
+  color: var(--primary);
 }
 
 /* Live API states and forms */

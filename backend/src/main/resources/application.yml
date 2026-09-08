@@ -1,6 +1,9 @@
 spring:
   application:
     name: vira-api
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
   profiles:
     default: dev
   jpa:
@@ -32,6 +35,8 @@ management:
         enabled: true
 
 app:
+  mail:
+    reset-url: ${RESET_PASSWORD_URL:http://localhost:5173/reset-password}
   security:
     jwt:
       issuer: vira-api

@@ -9,6 +9,7 @@ import vn.vira.notification.domain.Notification;
 import vn.vira.notification.domain.NotificationRepository;
 import vn.vira.shared.exception.NotFoundException;
 import vn.vira.shared.security.CurrentUser;
+import vn.vira.user.domain.User;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,11 @@ public class NotificationService {
 
         notification.markRead();
         return toResponse(notification);
+    }
+
+    @Transactional
+    public void create(User user, String type, String title, String body, String targetUrl) {
+        notificationRepository.save(new Notification(user, type, title, body, targetUrl));
     }
 
     private NotificationResponse toResponse(Notification notification) {

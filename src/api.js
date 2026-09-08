@@ -70,6 +70,13 @@ export const authApi = {
     request("/auth/login", { method: "POST", body: credentials }),
   register: (profile) =>
     request("/auth/register", { method: "POST", body: profile }),
+  forgotPassword: (email) =>
+    request("/auth/forgot-password", { method: "POST", body: { email } }),
+  resetPassword: (token, newPassword) =>
+    request("/auth/reset-password", {
+      method: "POST",
+      body: { token, newPassword },
+    }),
 };
 
 export const viraApi = {
@@ -109,6 +116,34 @@ export const viraApi = {
       method: "PATCH",
       token,
       body: change,
+    }),
+  taskCollaboration: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration`, { token }),
+  updateTaskAssignees: (token, projectId, taskId, userIds) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration/assignees`, {
+      method: "PUT",
+      token,
+      body: { userIds },
+    }),
+  joinTask: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration/join`, {
+      method: "POST",
+      token,
+    }),
+  leaveTask: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration/leave`, {
+      method: "DELETE",
+      token,
+    }),
+  watchTask: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration/watch`, {
+      method: "POST",
+      token,
+    }),
+  unwatchTask: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/collaboration/watch`, {
+      method: "DELETE",
+      token,
     }),
   members: (token, projectId) =>
     request(`/projects/${projectId}/members`, { token }),

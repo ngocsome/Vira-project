@@ -17,6 +17,7 @@ import vn.vira.shared.api.ApiResponse;
 public class AuthController {
 
     private final AuthService authService;
+    private final vn.vira.auth.application.PasswordResetService passwordResetService;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -33,4 +34,10 @@ public class AuthController {
     public ApiResponse<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ApiResponse.ok(authService.refresh(request), "Làm mới phiên đăng nhập thành công");
     }
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) { passwordResetService.request(request); return ApiResponse.ok(null, "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi"); }
+
+    @PostMapping("/reset-password")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) { passwordResetService.reset(request); return ApiResponse.ok(null, "Đặt lại mật khẩu thành công"); }
 }

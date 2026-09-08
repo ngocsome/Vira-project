@@ -62,7 +62,9 @@ const PRIORITY = {
   URGENT: "Khẩn cấp",
 };
 const Avatar = ({ text, small = false }) => (
-  <span className={`avatar ${small ? "small" : ""}`}>{text}</span>
+  <span className={`avatar ${small ? "small" : ""}`} aria-label={text}>
+    <span className="avatar-label">{text}</span>
+  </span>
 );
 const initials = (name = "V") =>
   name
@@ -677,6 +679,8 @@ function TaskModal({ task, close, update }) {
 function TaskDetails({ task, close, update, token, projectId, sprints }) {
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
+  const [collaboration, setCollaboration] = useState(null);
+  const [members, setMembers] = useState([]);
   const [bug, setBug] = useState({
     environment: "",
     severity: "MEDIUM",
@@ -690,12 +694,17 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
   const load = useCallback(async () => {
     if (!task) return;
     try {
-      const [nextComments, nextAttachments] = await Promise.all([
-        viraApi.comments(token, projectId, task.id),
-        viraApi.attachments(token, projectId, task.id),
-      ]);
+      const [nextComments, nextAttachments, nextCollaboration, nextMembers] =
+        await Promise.all([
+          viraApi.comments(token, projectId, task.id),
+          viraApi.attachments(token, projectId, task.id),
+          viraApi.taskCollaboration(token, projectId, task.id),
+          viraApi.members(token, projectId),
+        ]);
       setComments(nextComments);
       setAttachments(nextAttachments);
+      setCollaboration(nextCollaboration);
+      setMembers(nextMembers);
       if (task.taskType === "BUG")
         setBug(await viraApi.bug(token, projectId, task.id));
     } catch (err) {
@@ -758,6 +767,24 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
       setError(errorText(err));
     }
   };
+  const changeCollaboration = async (action) => {
+    try {
+      setError("");
+      setCollaboration(await action());
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const toggleAssignee = (userId) => {
+    const currentIds =
+      collaboration?.assignees?.map((item) => item.userId) || [];
+    const nextIds = currentIds.includes(userId)
+      ? currentIds.filter((id) => id !== userId)
+      : [...currentIds, userId];
+    changeCollaboration(() =>
+      viraApi.updateTaskAssignees(token, projectId, task.id, nextIds),
+    );
+  };
   return (
     <div className="modal-layer" role="dialog" aria-modal="true">
       <div className="task-modal task-details">
@@ -769,6 +796,38 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
         </div>
         <h2>{task.title}</h2>
         {error && <p className="form-error">{error}</p>}
+        {collaboration && (
+          <div className="task-collaboration-actions">
+            <button
+              className={`btn ${collaboration.currentUserAssigned ? "secondary" : "primary"}`}
+              onClick={() =>
+                changeCollaboration(() =>
+                  collaboration.currentUserAssigned
+                    ? viraApi.leaveTask(token, projectId, task.id)
+                    : viraApi.joinTask(token, projectId, task.id),
+                )
+              }
+            >
+              <Users size={15} />
+              {collaboration.currentUserAssigned
+                ? "Rời công việc"
+                : "Tham gia công việc"}
+            </button>
+            <button
+              className="btn secondary"
+              onClick={() =>
+                changeCollaboration(() =>
+                  collaboration.currentUserWatching
+                    ? viraApi.unwatchTask(token, projectId, task.id)
+                    : viraApi.watchTask(token, projectId, task.id),
+                )
+              }
+            >
+              <Bell size={15} />
+              {collaboration.currentUserWatching ? "Đang theo dõi" : "Theo dõi"}
+            </button>
+          </div>
+        )}
         <div className="modal-content">
           <div className="description">
             <h3>Mô tả</h3>
@@ -874,6 +933,69 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
             )}
           </div>
           <aside className="task-meta">
+            {collaboration && (
+              <div className="task-participants">
+                <span>Người thực hiện</span>
+                <div className="participant-list">
+                  {collaboration.assignees.length ? (
+                    collaboration.assignees.map((member) => (
+                      <div
+                        className="participant"
+                        key={member.userId}
+                        title={member.fullName}
+                      >
+                        <Avatar text={initials(member.fullName)} small />
+                        <b>{member.fullName}</b>
+                      </div>
+                    ))
+                  ) : (
+                    <p>Chưa phân công</p>
+                  )}
+                </div>
+                {collaboration.canManageParticipants && (
+                  <details className="participant-picker">
+                    <summary>Phân công thành viên</summary>
+                    {members.map((member) => {
+                      const selected = collaboration.assignees.some(
+                        (item) => item.userId === member.userId,
+                      );
+                      return (
+                        <label key={member.userId}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleAssignee(member.userId)}
+                          />
+                          <Avatar text={initials(member.fullName)} small />
+                          {member.fullName}
+                        </label>
+                      );
+                    })}
+                  </details>
+                )}
+              </div>
+            )}
+            {collaboration && (
+              <div className="task-participants">
+                <span>Người theo dõi ({collaboration.watchers.length})</span>
+                <div className="participant-list compact">
+                  {collaboration.watchers.length ? (
+                    collaboration.watchers.map((member) => (
+                      <div
+                        className="participant"
+                        key={member.userId}
+                        title={member.fullName}
+                      >
+                        <Avatar text={initials(member.fullName)} small />
+                        <b>{member.fullName}</b>
+                      </div>
+                    ))
+                  ) : (
+                    <p>Chưa có người theo dõi</p>
+                  )}
+                </div>
+              </div>
+            )}
             <div>
               <span>Trạng thái</span>
               <select
@@ -1300,7 +1422,8 @@ function NotificationBell({ token }) {
   );
 }
 function Auth({ authenticated }) {
-  const [mode, setMode] = useState("login");
+  const resetToken = new URLSearchParams(window.location.search).get("token");
+  const [mode, setMode] = useState(resetToken ? "reset" : "login");
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1309,11 +1432,23 @@ function Auth({ authenticated }) {
     setSaving(true);
     setError("");
     try {
-      authenticated(
-        mode === "login"
-          ? await authApi.login({ email: form.email, password: form.password })
-          : await authApi.register(form),
-      );
+      if (mode === "forgot") {
+        await authApi.forgotPassword(form.email);
+        setError("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.");
+      } else if (mode === "reset") {
+        await authApi.resetPassword(resetToken, form.password);
+        setMode("login");
+        setError("Đặt lại mật khẩu thành công. Hãy đăng nhập.");
+        window.history.replaceState({}, "", window.location.pathname);
+      } else
+        authenticated(
+          mode === "login"
+            ? await authApi.login({
+                email: form.email,
+                password: form.password,
+              })
+            : await authApi.register(form),
+        );
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -1328,11 +1463,23 @@ function Auth({ authenticated }) {
           <span>vira</span>
         </div>
         <p className="eyebrow">QUẢN LÝ DỰ ÁN</p>
-        <h1>{mode === "login" ? "Chào mừng trở lại" : "Tạo tài khoản mới"}</h1>
+        <h1>
+          {mode === "forgot"
+            ? "Quên mật khẩu"
+            : mode === "reset"
+              ? "Đặt lại mật khẩu"
+              : mode === "login"
+                ? "Chào mừng trở lại"
+                : "Tạo tài khoản mới"}
+        </h1>
         <p>
-          {mode === "login"
-            ? "Đăng nhập để tiếp tục với không gian làm việc của bạn."
-            : "Bắt đầu quản lý công việc cùng Vira."}
+          {mode === "forgot"
+            ? "Nhập email để nhận liên kết đặt lại mật khẩu."
+            : mode === "reset"
+              ? "Đặt mật khẩu mới cho tài khoản của bạn."
+              : mode === "login"
+                ? "Đăng nhập để tiếp tục với không gian làm việc của bạn."
+                : "Bắt đầu quản lý công việc cùng Vira."}
         </p>
         <form onSubmit={submit}>
           {error && <p className="form-error">{error}</p>}
@@ -1349,48 +1496,69 @@ function Auth({ authenticated }) {
               />
             </label>
           )}
-          <label>
-            Email
-            <input
-              required
-              type="email"
-              value={form.email}
-              onChange={(event) =>
-                setForm({ ...form, email: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            Mật khẩu
-            <input
-              required
-              minLength="8"
-              type="password"
-              value={form.password}
-              onChange={(event) =>
-                setForm({ ...form, password: event.target.value })
-              }
-            />
-          </label>
+          {mode !== "reset" && (
+            <label>
+              Email
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={(event) =>
+                  setForm({ ...form, email: event.target.value })
+                }
+              />
+            </label>
+          )}
+          {mode !== "forgot" && (
+            <label>
+              Mật khẩu
+              <input
+                required
+                minLength="8"
+                type="password"
+                value={form.password}
+                onChange={(event) =>
+                  setForm({ ...form, password: event.target.value })
+                }
+              />
+            </label>
+          )}
           <button className="btn primary auth-submit" disabled={saving}>
             {saving
               ? "Đang xử lý..."
-              : mode === "login"
-                ? "Đăng nhập"
-                : "Tạo tài khoản"}
+              : mode === "forgot"
+                ? "Gửi liên kết"
+                : mode === "reset"
+                  ? "Đặt lại mật khẩu"
+                  : mode === "login"
+                    ? "Đăng nhập"
+                    : "Tạo tài khoản"}
           </button>
         </form>
-        <button
-          className="auth-switch"
-          onClick={() => {
-            setMode(mode === "login" ? "register" : "login");
-            setError("");
-          }}
-        >
-          {mode === "login"
-            ? "Chưa có tài khoản? Đăng ký"
-            : "Đã có tài khoản? Đăng nhập"}
-        </button>
+        {mode === "login" && (
+          <button
+            className="auth-switch"
+            onClick={() => {
+              setMode("forgot");
+              setError("");
+            }}
+          >
+            Quên mật khẩu?
+          </button>
+        )}
+        {mode !== "reset" && (
+          <button
+            className="auth-switch"
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+            }}
+          >
+            {mode === "login"
+              ? "Chưa có tài khoản? Đăng ký"
+              : "Đã có tài khoản? Đăng nhập"}
+          </button>
+        )}
       </section>
     </main>
   );

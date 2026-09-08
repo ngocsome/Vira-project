@@ -1,0 +1,24 @@
+
+> vira-frontend@0.1.0 dev
+> vite --host 0.0.0.0
+
+
+  VITE v8.2.2  ready in 528 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.20.105:5173/  Wi-Fi
+  ➜  Network: http://172.31.0.1:5173/      vEthernet (WSL (Hyp…
+  ➜  press h + enter to show help
+23:11:38 [vite] (client) hmr update /src/styles.css
+23:11:44 [vite] (client) hmr update /src/styles.css
+23:12:59 [vite] (client) hmr update /src/styles.css
+23:14:48 [vite] (client) page reload src/main.jsx
+23:14:48 [vite] (client) hmr update /src/styles.css
+23:16:05 [vite] (client) hmr update /src/styles.css
+23:23:58 [vite] (client) page reload src/api.js
+23:24:17 [vite] (client) page reload src/main.jsx
+23:24:34 [vite] (client) page reload src/main.jsx
+23:24:48 [vite] (client) hmr update /src/styles.css
+23:27:15 [vite] (client) page reload src/main.jsx
+23:27:43 [vite] (client) page reload src/main.jsx
+23:28:07 [vite] (client) page reload src/main.jsx
