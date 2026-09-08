@@ -1,0 +1,38 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: vira-mysql
+    environment:
+      MYSQL_DATABASE: vira
+      MYSQL_USER: vira_app
+      MYSQL_PASSWORD: vira_app_dev
+      MYSQL_ROOT_PASSWORD: root_dev_only
+    ports:
+      - "3307:3306"
+    volumes:
+      - vira_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_dev_only"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+    container_name: vira-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/vira?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: vira_app
+      DB_PASSWORD: vira_app_dev
+      JWT_SECRET: change-this-production-jwt-secret-before-deploying-at-least-32-bytes
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  vira_mysql_data:
