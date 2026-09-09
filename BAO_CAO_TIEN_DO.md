@@ -1,80 +1,99 @@
-# Báo cáo tiến độ Vira
+# Báo cáo nghiệm thu kỹ thuật — Vira
 
-_Cập nhật: 09/09/2026 — xác minh trên Docker local (MySQL, Mailpit, Redis, API)._
+_Cập nhật ngày 09/09/2026. Phạm vi: mã nguồn hiện tại, Docker local và CI._
+
+## Tổng quan
+
+Vira là hệ thống quản lý công việc theo workspace/project, hỗ trợ Kanban, Backlog, Sprint, cộng tác task, phân quyền và báo cáo. Các hạng mục chức năng đã được triển khai ở backend và frontend; môi trường Docker hiện gồm API, MySQL, Mailpit và Redis.
 
 ## Đã hoàn thành
 
-### Bảo mật và phân quyền
+### Xác thực và bảo mật
 
-- Bổ sung kiểm tra quyền quản trị project cho `OWNER`, `MANAGER`, `LEAD`; `GUEST` và `MEMBER` không thể cập nhật WIP/cấu hình project hoặc xóa task.
-- Kiểm tra quyền chỉnh sửa task: chỉ role quản trị project, reporter hoặc assignee mới được cập nhật task.
-- Các truy vấn theo project/task kiểm tra membership, không để lộ project không thuộc user qua API thông thường.
-- Rate limit dùng Redis trong Docker, nên bộ đếm được dùng chung giữa nhiều API instance: login (8 lần/phút/IP), quên mật khẩu (3 lần/15 phút/IP+email) và upload (20 lần/phút/user+IP). API trả HTTP 429 khi vượt ngưỡng. Fallback in-memory chỉ dành cho unit test/môi trường không cấu hình Redis.
-- Đã có unit test cho GUEST, assignee, LEAD, IDOR project và rate limiter.
+- Đăng ký, đăng nhập, refresh token, đổi mật khẩu và đăng xuất.
+- Quên mật khẩu bằng email: tạo token một lần có thời hạn, gửi email qua Mailpit và đặt lại mật khẩu bằng token.
+- Phân quyền workspace/project/task; người ngoài workspace không thể đọc dữ liệu task, comment, audit hoặc báo cáo của project khác.
+- Kiểm tra IDOR qua E2E với hai workspace độc lập.
+- Rate limit cho login, quên mật khẩu và upload. Khi chạy Docker, bộ đếm dùng Redis để dùng chung giữa nhiều API instance; request vượt giới hạn nhận HTTP 429.
 
-### Task và cộng tác
+### Workspace, project và task
 
-- Thuật toán kéo-thả Backlog reindex toàn bộ task theo position tuần tự; có test xác nhận không trùng position sau kéo-thả.
-- Labels cho project/task, liên kết task (`BLOCKS`, `RELATES_TO`, `DUPLICATES`) và API thêm/xóa/đọc liên kết.
-- Assignee, watcher, join/leave task đã có; notification được gửi cho thay đổi status, comment, attachment và phân công.
-- Audit ghi nhận tạo/chuyển trạng thái/move/sprint/xóa/khôi phục task; cộng tác, comment, upload, nhãn và liên kết task.
+- Quản lý workspace/project, thành viên và role project.
+- Lưu trữ và khôi phục task, project, workspace.
+- Backlog kéo-thả có thuật toán reindex để tránh trùng `position` khi di chuyển nhiều vị trí.
+- Kanban có cấu hình cột và giới hạn WIP.
+- Tìm kiếm/lọc task phía server, phân trang và lưu bộ lọc cá nhân.
 
-### API và dữ liệu
+### Cộng tác và theo dõi
 
-- Audit API cho project và task.
-- Reports API: Burndown, Velocity theo sprint hoàn tất, Cumulative Flow theo lịch sử thay đổi trạng thái, workload theo thành viên và bug severity. Flyway V9 lưu event trạng thái cho task mới; V10 tạo mốc nền cho task cũ.
-- Search/filter/pagination server-side cho task; saved filter cá nhân với tạo/đọc/xóa.
-- Migration Flyway V7 (labels/task links), V8 (saved filters), V9 (task status history) và V10 (backfill history) đã áp dụng thành công trên MySQL Docker.
-- OpenAPI/Swagger được bật tại `/api/v1/swagger-ui/index.html`.
+- Assignee, watcher, join/leave task.
+- Comment, upload/download attachment, notification các thao tác chính.
+- Nhãn task, liên kết task (`BLOCKS`, `RELATES_TO`, `DUPLICATES`).
+- Màn quản trị nhãn theo project: tạo, sửa, xóa.
+- Audit log cho task, project, comment, attachment, assignment, watcher, nhãn, liên kết, trạng thái và archive/restore.
+
+### Báo cáo
+
+- Burndown, Velocity, workload theo thành viên và bug theo severity.
+- Cumulative Flow theo lịch sử trạng thái task. Migration V9 ghi event trạng thái cho task mới; V10 tạo mốc nền cho task đã tồn tại trước khi bổ sung lịch sử.
 
 ### Frontend
 
-- Typography hệ thống đã đổi sang Be Vietnam Pro.
-- Task detail: labels, tạo/gỡ liên kết task, assignee/watcher, join/leave, comment, attachment và lịch sử task. Có màn quản trị nhãn riêng để tạo/sửa/xóa.
-- Backlog: tìm kiếm/lọc server-side, debounce và saved filters.
-- Kanban: UI cấu hình cột/WIP, cảnh báo khi vượt WIP.
-- Audit/history page; reports page sử dụng dữ liệu backend mới.
-- Profile và đổi mật khẩu có màn hình riêng.
-- Archive/restore: task, project và workspace đều có API/UI; project/workspace có màn hình chọn/khôi phục sau khi archive.
+- Font hệ thống Be Vietnam Pro.
+- Giao diện quản lý task/cộng tác, reports, audit, filter, Kanban WIP, profile/đổi mật khẩu, archive/restore và nhãn.
+- Đã regression bằng Desktop Chrome và Pixel 5 qua Playwright.
 
-### Vận hành và kiểm thử đã xác nhận
+## Kiểm thử đã chạy
 
-- CI GitHub Actions chạy Maven test + JaCoCo quality gate, package API, frontend build, Docker MySQL/Mailpit/Redis và Playwright Chromium; report Playwright được lưu artifact.
-- Script backup MySQL có sẵn; bổ sung restore MySQL, backup uploads và restore uploads (restore yêu cầu nhập `RESTORE`).
-- `mvnw test`: pass, có JaCoCo report và quality gate instruction baseline 5%.
-- `npm run build`: pass.
-- Docker stack đã khởi động; MySQL/Mailpit healthy, API health và OpenAPI trả HTTP 200.
-- Smoke test runtime đã pass: login demo, task search, saved filter tạo/đọc/xóa, audit ghi MySQL, GUEST đọc board HTTP 200 nhưng cập nhật WIP HTTP 403.
-- Playwright E2E Docker pass 4/4 trên Desktop Chrome và Pixel 5: đăng nhập, UI quên mật khẩu, reset bằng token Mailpit, upload/download, task/project/workspace archive–restore, IDOR hai workspace độc lập, join/watch task.
-- Backup MySQL + uploads và restore có xác nhận `RESTORE` đã chạy thực tế trên Docker; API health kiểm tra lại thành công sau restore.
-- Performance smoke Docker: 40 request search, concurrency 8, 0 lỗi, p50 28 ms, p95 75 ms (máy local, không phải benchmark production).
+| Hạng mục | Kết quả |
+| --- | --- |
+| Maven unit/service test + JaCoCo | Pass; có quality gate instruction baseline 5% |
+| Frontend production build | Pass |
+| Playwright Desktop Chrome | 4/4 pass |
+| Playwright Pixel 5 | 4/4 pass |
+| Reset password email/token qua Mailpit | Pass |
+| Upload/download thực tế | Pass |
+| Task/project/workspace archive–restore | Pass |
+| IDOR hai workspace độc lập | Pass; API trả 403/404 an toàn, không lộ dữ liệu |
+| Join/watch collaboration | Pass |
+| Redis rate limit | Xác nhận chuỗi `200, 200, 200, 429` |
+| Backup/restore MySQL và uploads | Đã chạy Docker, API health hoạt động sau restore |
+| Performance smoke local | 40 request search, concurrency 8, 0 lỗi, p50 28 ms, p95 75 ms |
 
-## Giới hạn cần biết trước khi production
+## CI và vận hành
 
-- E2E hiện là smoke/regression cho các luồng trọng yếu, chưa thay thế ma trận kiểm thử mọi tổ hợp role × endpoint. CI có test IDOR hai workspace cho task/report/comment/audit và kiểm thử collaboration; khi mở endpoint mới cần thêm case vào `e2e/lifecycle.spec.js`.
-- Cumulative Flow chính xác từ thời điểm V9 được áp dụng. Task cũ có một mốc nền được V10 backfill; các lần chuyển trạng thái lịch sử trước đó không thể khôi phục nếu không có log nguồn.
-- Performance smoke là số liệu local có kiểm soát, không phải tải production. Cần chạy k6/Gatling trên hạ tầng mục tiêu trước khi công bố SLA.
-- Coverage gate 5% là baseline có tác dụng chặn hồi quy nhưng không phải mục tiêu chất lượng cuối. Nên nâng dần theo module (ví dụ 60–80%) khi đội ngũ chốt đặc tả.
-- Responsive đã được regression bằng Pixel 5 và Desktop Chrome; vẫn cần QA thủ công trên thiết bị/iOS thật nếu phạm vi nghiệm thu yêu cầu.
+GitHub Actions thực hiện:
 
-## Lệnh kiểm tra nhanh
+1. Maven test và JaCoCo.
+2. Build API và frontend.
+3. Cài Playwright Chromium.
+4. Khởi động Docker MySQL, Mailpit, Redis và API.
+5. Chờ health endpoint, chạy E2E Chromium và lưu Playwright report làm artifact.
+
+Các script backup/restore hỗ trợ MySQL và thư mục upload. Các thao tác restore yêu cầu gõ `RESTORE` để tránh ghi đè nhầm dữ liệu.
+
+## Giới hạn còn lại trước production
+
+- E2E hiện là smoke/regression cho luồng trọng yếu, chưa phải ma trận mọi role × mọi endpoint. Endpoint mới cần được bổ sung test cùng lúc.
+- CFD chính xác tuyệt đối kể từ lúc V9 được áp dụng. Dữ liệu task cũ chỉ có mốc nền, không thể dựng lại các lần đổi trạng thái quá khứ nếu không có nguồn log cũ.
+- Performance smoke là số liệu trên máy local, không phải SLA production. Nên thực hiện k6/Gatling trên hạ tầng mục tiêu trước khi công bố ngưỡng tải.
+- JaCoCo 5% là quality gate nền để chặn hồi quy; cần nâng dần coverage theo module sau khi chốt đặc tả nghiệm thu.
+- Responsive đã được tự động kiểm tra ở desktop và Pixel 5; nếu phạm vi nghiệm thu yêu cầu thì cần QA thủ công iOS/Android và thiết bị thật.
+
+## Cách chạy lại kiểm thử
 
 ```powershell
 cd D:\Vira
 docker compose -f backend\compose.yaml up -d --build
 .\backend\mvnw.cmd -f backend\pom.xml test
+npm run build
 npm run test:e2e -- --project=chromium
 npm run test:e2e -- --project=mobile-chrome
 npm run test:performance
 ```
 
-## Cách tiếp tục
+Các địa chỉ local:
 
-```powershell
-cd D:\Vira
-docker compose -f backend\compose.yaml ps
-```
-
-API: `http://localhost:8080/api/v1`  
-Swagger: `http://localhost:8080/api/v1/swagger-ui/index.html`  
-Mailpit: `http://localhost:8025`
+- Frontend: `http://localhost:5173`
+- API/Swagger: `http://localhost:8080/api/v1/swagger-ui/index.html`
+- Mailpit: `http://localhost:8025`
