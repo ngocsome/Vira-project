@@ -4,4 +4,3 @@ test-results/
 backend/target/
 backend/backups/
 backend/uploads/
-dist/
