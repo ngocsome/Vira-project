@@ -22,6 +22,7 @@ import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
+import vn.vira.audit.application.ActivityLogService;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class TaskCollaborationService {
     private final ProjectMemberRepository projectMemberRepository;
     private final NotificationService notificationService;
     private final CurrentUser currentUser;
+    private final ActivityLogService activityLogs;
 
     @Transactional(readOnly = true)
     public TaskCollaborationResponse find(Long projectId, Long taskId) {
@@ -47,6 +49,7 @@ public class TaskCollaborationService {
         Set<User> next = membersOfProject(projectId, userIds);
         Set<Long> previousIds = task.getAssignees().stream().map(User::getId).collect(java.util.stream.Collectors.toSet());
         task.setAssignees(next);
+        activityLogs.record(task, "TASK_ASSIGNEES_UPDATED", "Cập nhật người thực hiện");
         next.stream()
                 .filter(user -> !previousIds.contains(user.getId()) && !user.getId().equals(currentUser.id()))
                 .forEach(user -> notificationService.create(
@@ -65,6 +68,7 @@ public class TaskCollaborationService {
         User user = currentUserEntity();
         task.getAssignees().add(user);
         task.getWatchers().add(user);
+        activityLogs.record(task, "TASK_JOINED", "Tham gia công việc");
         return response(task, user.getId());
     }
 
@@ -74,6 +78,7 @@ public class TaskCollaborationService {
         Long userId = currentUser.id();
         task.getAssignees().removeIf(user -> user.getId().equals(userId));
         task.getWatchers().removeIf(user -> user.getId().equals(userId));
+        activityLogs.record(task, "TASK_LEFT", "Rời công việc");
         return response(task, userId);
     }
 
@@ -81,6 +86,7 @@ public class TaskCollaborationService {
     public TaskCollaborationResponse watch(Long projectId, Long taskId) {
         Task task = requireTask(projectId, taskId);
         task.getWatchers().add(currentUserEntity());
+        activityLogs.record(task, "TASK_WATCHED", "Theo dõi công việc");
         return response(task, currentUser.id());
     }
 
@@ -88,6 +94,7 @@ public class TaskCollaborationService {
     public TaskCollaborationResponse unwatch(Long projectId, Long taskId) {
         Task task = requireTask(projectId, taskId);
         task.getWatchers().removeIf(user -> user.getId().equals(currentUser.id()));
+        activityLogs.record(task, "TASK_UNWATCHED", "Bỏ theo dõi công việc");
         return response(task, currentUser.id());
     }
 

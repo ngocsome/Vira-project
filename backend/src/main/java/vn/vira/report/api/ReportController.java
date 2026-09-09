@@ -22,4 +22,9 @@ public class ReportController {
                 "Lấy báo cáo tổng quan thành công"
         );
     }
+
+    @GetMapping
+    public ApiResponse<ProjectReportsResponse> details(@PathVariable Long projectId) {
+        return ApiResponse.ok(reportService.details(projectId), "Lấy dữ liệu báo cáo thành công");
+    }
 }

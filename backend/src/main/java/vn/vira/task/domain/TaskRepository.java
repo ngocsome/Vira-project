@@ -3,10 +3,13 @@ package vn.vira.task.domain;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface TaskRepository extends JpaRepository<Task, Long> {
+public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificationExecutor<Task> {
 
     List<Task> findByProjectIdAndDeletedAtIsNullOrderByPositionAsc(Long projectId);
+
+    List<Task> findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long projectId);
 
     Optional<Task> findByIdAndProjectIdAndDeletedAtIsNull(Long id, Long projectId);
 

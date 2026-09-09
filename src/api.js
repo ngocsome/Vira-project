@@ -80,25 +80,113 @@ export const authApi = {
 };
 
 export const viraApi = {
+  profile: (token) => request("/users/me", { token }),
+  updateProfile: (token, profile) =>
+    request("/users/me", { method: "PUT", token, body: profile }),
+  changePassword: (token, password) =>
+    request("/users/me/password", { method: "PUT", token, body: password }),
   workspaces: (token) => request("/workspaces", { token }),
+  archivedWorkspaces: (token) => request("/workspaces/archived", { token }),
   createWorkspace: (token, workspace) =>
     request("/workspaces", { method: "POST", token, body: workspace }),
   projects: (token, workspaceId) =>
     request(`/workspaces/${workspaceId}/projects`, { token }),
+  archivedProjects: (token, workspaceId) =>
+    request(`/workspaces/${workspaceId}/projects/archived`, { token }),
   createProject: (token, workspaceId, project) =>
     request(`/workspaces/${workspaceId}/projects`, {
       method: "POST",
       token,
       body: project,
     }),
+  archiveWorkspace: (token, workspaceId) =>
+    request(`/workspaces/${workspaceId}/archive`, { method: "PATCH", token }),
+  restoreWorkspace: (token, workspaceId) =>
+    request(`/workspaces/${workspaceId}/restore`, { method: "PATCH", token }),
   updateProject: (token, projectId, project) =>
     request(`/projects/${projectId}`, { method: "PUT", token, body: project }),
+  archiveProject: (token, projectId) =>
+    request(`/projects/${projectId}/archive`, { method: "PATCH", token }),
+  restoreProject: (token, projectId) =>
+    request(`/projects/${projectId}/restore`, { method: "PATCH", token }),
   tasks: (token, projectId) =>
     request(`/projects/${projectId}/tasks`, { token }),
+  deletedTasks: (token, projectId) =>
+    request(`/projects/${projectId}/tasks/deleted`, { token }),
+  restoreTask: (token, projectId, taskId, version) =>
+    request(
+      `/projects/${projectId}/tasks/${taskId}/restore?version=${version}`,
+      {
+        method: "PATCH",
+        token,
+      },
+    ),
+  searchTasks: (token, projectId, filters) => {
+    const query = new URLSearchParams(
+      Object.entries(filters).filter(
+        ([, value]) => value !== "" && value != null,
+      ),
+    );
+    return request(`/projects/${projectId}/tasks/search?${query}`, { token });
+  },
+  savedTaskFilters: (token, projectId) =>
+    request(`/projects/${projectId}/tasks/filters`, { token }),
+  saveTaskFilter: (token, projectId, filter) =>
+    request(`/projects/${projectId}/tasks/filters`, {
+      method: "POST",
+      token,
+      body: filter,
+    }),
+  deleteTaskFilter: (token, projectId, filterId) =>
+    request(`/projects/${projectId}/tasks/filters/${filterId}`, {
+      method: "DELETE",
+      token,
+    }),
+  labels: (token, projectId) =>
+    request(`/projects/${projectId}/labels`, { token }),
+  createLabel: (token, projectId, label) =>
+    request(`/projects/${projectId}/labels`, {
+      method: "POST",
+      token,
+      body: label,
+    }),
+  taskLabels: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/labels`, { token }),
+  updateTaskLabels: (token, projectId, taskId, labelIds) =>
+    request(`/projects/${projectId}/tasks/${taskId}/labels`, {
+      method: "PUT",
+      token,
+      body: { labelIds },
+    }),
+  taskLinks: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/links`, { token }),
+  addTaskLink: (token, projectId, taskId, link) =>
+    request(`/projects/${projectId}/tasks/${taskId}/links`, {
+      method: "POST",
+      token,
+      body: link,
+    }),
+  removeTaskLink: (token, projectId, taskId, linkId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/links/${linkId}`, {
+      method: "DELETE",
+      token,
+    }),
   board: (token, projectId) =>
     request(`/projects/${projectId}/board`, { token }),
+  updateBoardColumn: (token, projectId, columnId, column) =>
+    request(`/projects/${projectId}/board/columns/${columnId}`, {
+      method: "PATCH",
+      token,
+      body: column,
+    }),
   overview: (token, projectId) =>
     request(`/projects/${projectId}/reports/overview`, { token }),
+  reports: (token, projectId) =>
+    request(`/projects/${projectId}/reports`, { token }),
+  projectActivity: (token, projectId) =>
+    request(`/projects/${projectId}/activity`, { token }),
+  taskActivity: (token, projectId, taskId) =>
+    request(`/projects/${projectId}/tasks/${taskId}/activity`, { token }),
   createTask: (token, projectId, task) =>
     request(`/projects/${projectId}/tasks`, {
       method: "POST",

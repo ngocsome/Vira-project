@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import vn.vira.project.domain.Project;
+import vn.vira.label.domain.Label;
 import vn.vira.shared.persistence.BaseEntity;
 import vn.vira.sprint.domain.Sprint;
 import vn.vira.user.domain.User;
@@ -62,6 +63,10 @@ public class Task extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private Set<User> watchers = new LinkedHashSet<>();
+
+    @ManyToMany
+    @JoinTable(name = "task_labels", joinColumns = @JoinColumn(name = "task_id"), inverseJoinColumns = @JoinColumn(name = "label_id"))
+    private Set<Label> labels = new LinkedHashSet<>();
 
     @Column(name = "task_code", nullable = false, length = 30)
     private String taskCode;

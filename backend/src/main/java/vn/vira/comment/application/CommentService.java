@@ -16,6 +16,8 @@ import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
+import vn.vira.task.application.TaskNotificationService;
+import vn.vira.audit.application.ActivityLogService;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,8 @@ public class CommentService {
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final CurrentUser currentUser;
+    private final TaskNotificationService taskNotifications;
+    private final ActivityLogService activityLogs;
 
     @Transactional(readOnly = true)
     public List<CommentResponse> findByTask(Long projectId, Long taskId) {
@@ -47,6 +51,8 @@ public class CommentService {
         Comment parent = findParent(taskId, request.parentCommentId());
 
         Comment comment = commentRepository.save(new Comment(task, author, parent, request.body().trim()));
+        activityLogs.record(task, "COMMENT_CREATED", "Thêm bình luận");
+        taskNotifications.notifyParticipants(task, "TASK_COMMENT", "Bình luận mới tại " + task.getTaskCode(), request.body().trim());
         return toResponse(comment);
     }
 
@@ -58,6 +64,7 @@ public class CommentService {
         Comment comment = commentRepository.findByIdAndTaskIdAndDeletedAtIsNull(commentId, taskId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy bình luận"));
         comment.setPinned(!comment.isPinned());
+        activityLogs.record(comment.getTask(), comment.isPinned() ? "COMMENT_PINNED" : "COMMENT_UNPINNED", "Cập nhật ghim bình luận");
         return toResponse(comment);
     }
 

@@ -21,6 +21,9 @@ import vn.vira.shared.exception.NotFoundException;
 import vn.vira.shared.security.CurrentUser;
 import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
+import vn.vira.task.application.TaskAuthorizationService;
+import vn.vira.task.application.TaskNotificationService;
+import vn.vira.audit.application.ActivityLogService;
 import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
 
@@ -34,6 +37,9 @@ public class AttachmentService {
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final CurrentUser currentUser;
+    private final TaskAuthorizationService taskAuthorizationService;
+    private final TaskNotificationService taskNotifications;
+    private final ActivityLogService activityLogs;
     private final Path storagePath = Path.of("uploads").toAbsolutePath().normalize();
 
     @Transactional(readOnly = true)
@@ -47,6 +53,7 @@ public class AttachmentService {
     public AttachmentResponse upload(Long projectId, Long taskId, MultipartFile file) {
         projectService.requireMember(projectId);
         Task task = requireTask(projectId, taskId);
+        taskAuthorizationService.requireTaskEditor(task);
         validate(file);
         User uploader = userRepository.findById(currentUser.id()).orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
         String storedName = UUID.randomUUID() + extension(file.getOriginalFilename());
@@ -58,7 +65,10 @@ public class AttachmentService {
         } catch (IOException exception) {
             throw new BusinessException("Không thể lưu tệp đính kèm");
         }
-        return toResponse(attachmentRepository.save(new TaskAttachment(task, uploader, safeName(file.getOriginalFilename()), storedName, file.getContentType(), file.getSize())));
+        AttachmentResponse response = toResponse(attachmentRepository.save(new TaskAttachment(task, uploader, safeName(file.getOriginalFilename()), storedName, file.getContentType(), file.getSize())));
+        activityLogs.record(task, "ATTACHMENT_UPLOADED", "Tải tệp: " + response.originalName());
+        taskNotifications.notifyParticipants(task, "TASK_ATTACHMENT", "Tệp mới tại " + task.getTaskCode(), response.originalName());
+        return response;
     }
 
     @Transactional(readOnly = true)

@@ -10,6 +10,9 @@ import {
   CircleAlert,
   Clock3,
   FileBarChart2,
+  Eye,
+  EyeOff,
+  History,
   Flag,
   FolderKanban,
   GripVertical,
@@ -38,6 +41,7 @@ const NAV = [
   ["Sprint", Clock3],
   ["Báo cáo", FileBarChart2],
   ["Thành viên", Users],
+  ["Lịch sử", History],
 ];
 const STATUS = {
   TODO: ["Cần thực hiện", "slate"],
@@ -266,7 +270,40 @@ function Overview({ overview, tasks, open, create }) {
     </>
   );
 }
-function Board({ tasks, open, create }) {
+function Board({ tasks, open, create, token, projectId }) {
+  const [columns, setColumns] = useState([]);
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    viraApi
+      .board(token, projectId)
+      .then((board) => setColumns(board.columns))
+      .catch((err) => setError(errorText(err)));
+  }, [token, projectId]);
+  const saveColumn = async (column, values) => {
+    try {
+      const next = await viraApi.updateBoardColumn(
+        token,
+        projectId,
+        column.id,
+        values,
+      );
+      setColumns((current) =>
+        current.map((item) => (item.id === next.id ? next : item)),
+      );
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const displayColumns = columns.length
+    ? columns
+    : ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].map((taskStatus, index) => ({
+        id: taskStatus,
+        taskStatus,
+        name: STATUS[taskStatus][0],
+        position: index + 1,
+        wipLimit: null,
+      }));
   return (
     <section className="board-wrap">
       <div className="board-toolbar">
@@ -274,23 +311,57 @@ function Board({ tasks, open, create }) {
           <h2>Bảng công việc</h2>
           <p>Dữ liệu từ dự án hiện tại</p>
         </div>
-        <button className="btn primary" onClick={() => create("TODO")}>
-          <Plus size={17} />
-          Tạo công việc
-        </button>
+        <div className="board-actions">
+          <button
+            className="btn secondary"
+            onClick={() => setEditing(!editing)}
+            aria-pressed={editing}
+          >
+            <Settings size={16} />{" "}
+            {editing ? "Đóng cấu hình" : "Cấu hình cột/WIP"}
+          </button>
+          <button className="btn primary" onClick={() => create("TODO")}>
+            <Plus size={17} />
+            Tạo công việc
+          </button>
+        </div>
       </div>
+      {error && <p className="form-error">{error}</p>}
+      {editing && (
+        <div className="card wip-config">
+          <h3>Cấu hình cột và giới hạn WIP</h3>
+          <p>Đặt WIP để cảnh báo khi cột có quá nhiều công việc đang mở.</p>
+          {columns.map((column) => (
+            <WipColumnEditor
+              key={column.id}
+              column={column}
+              save={saveColumn}
+            />
+          ))}
+        </div>
+      )}
       <div className="board">
-        {["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].map((status) => {
-          const [label, color] = STATUS[status];
+        {displayColumns.map((column) => {
+          const status = column.taskStatus;
+          const [, color] = STATUS[status] || [column.name, "slate"];
           const items = tasks.filter((task) => task.status === status);
+          const overWip = column.wipLimit && items.length > column.wipLimit;
           return (
-            <div className="kanban-col" key={status}>
+            <div
+              className={`kanban-col ${overWip ? "over-wip" : ""}`}
+              key={column.id}
+            >
               <div className="column-head">
                 <span>
                   <i className={`dot ${color}`} />
-                  {label}
+                  {column.name}
                   <b>{items.length}</b>
                 </span>
+                {column.wipLimit && (
+                  <small title="Giới hạn WIP">
+                    WIP {items.length}/{column.wipLimit}
+                  </small>
+                )}
               </div>
               <div className="task-list">
                 {items.map((task) => (
@@ -313,19 +384,97 @@ function Board({ tasks, open, create }) {
     </section>
   );
 }
-function Backlog({ tasks, open, create, move }) {
+function WipColumnEditor({ column, save }) {
+  const [name, setName] = useState(column.name);
+  const [wipLimit, setWipLimit] = useState(column.wipLimit || "");
+  return (
+    <form
+      className="wip-row"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save(column, {
+          name,
+          wipLimit: wipLimit === "" ? null : Number(wipLimit),
+        });
+      }}
+    >
+      <label>
+        Tên cột
+        <input
+          required
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <label>
+        WIP limit
+        <input
+          type="number"
+          min="1"
+          max="1000"
+          value={wipLimit}
+          onChange={(event) => setWipLimit(event.target.value)}
+          placeholder="Không giới hạn"
+        />
+      </label>
+      <button className="btn secondary">Lưu</button>
+    </form>
+  );
+}
+function Backlog({ tasks, open, create, move, token, projectId }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [draggedId, setDraggedId] = useState(null);
-  const visible = tasks
-    .filter((task) =>
-      `${task.taskCode} ${task.title}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-    )
-    .filter((task) => !statusFilter || task.status === statusFilter)
-    .filter((task) => !priorityFilter || task.priority === priorityFilter);
+  const [visible, setVisible] = useState(tasks);
+  const [savedFilters, setSavedFilters] = useState([]);
+  const [filterName, setFilterName] = useState("");
+  const filters = { q: query, status: statusFilter, priority: priorityFilter };
+  const loadFilters = useCallback(async () => {
+    try {
+      setSavedFilters(await viraApi.savedTaskFilters(token, projectId));
+    } catch {
+      /* saved filters must not block backlog */
+    }
+  }, [token, projectId]);
+  useEffect(() => {
+    loadFilters();
+  }, [loadFilters]);
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const result = await viraApi.searchTasks(token, projectId, filters);
+        setVisible(result.items);
+      } catch {
+        setVisible(tasks);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [token, projectId, query, statusFilter, priorityFilter, tasks]);
+  const applyFilter = (saved) => {
+    try {
+      const next = JSON.parse(saved.filters);
+      setQuery(next.q || "");
+      setStatusFilter(next.status || "");
+      setPriorityFilter(next.priority || "");
+    } catch {
+      /* invalid historical filter is ignored */
+    }
+  };
+  const saveFilter = async () => {
+    const name = filterName.trim();
+    if (!name) return;
+    try {
+      await viraApi.saveTaskFilter(token, projectId, {
+        name,
+        filters: JSON.stringify(filters),
+      });
+      setFilterName("");
+      await loadFilters();
+    } catch {
+      /* API errors are shown by the next application load */
+    }
+  };
   return (
     <section>
       <div className="page-head">
@@ -371,6 +520,32 @@ function Backlog({ tasks, open, create, move }) {
             </option>
           ))}
         </select>
+      </div>
+      <div className="saved-filter-bar" aria-label="Bộ lọc đã lưu">
+        <span>Bộ lọc đã lưu</span>
+        {savedFilters.map((saved) => (
+          <button
+            key={saved.id}
+            className="filter-chip"
+            onClick={() => applyFilter(saved)}
+          >
+            {saved.name}
+          </button>
+        ))}
+        <input
+          value={filterName}
+          onChange={(event) => setFilterName(event.target.value)}
+          maxLength="120"
+          placeholder="Tên bộ lọc"
+          aria-label="Tên bộ lọc mới"
+        />
+        <button
+          className="btn secondary"
+          onClick={saveFilter}
+          disabled={!filterName.trim()}
+        >
+          <Save size={14} /> Lưu bộ lọc
+        </button>
       </div>
       <div className="backlog-group">
         <div className="group-head">
@@ -418,7 +593,14 @@ function Backlog({ tasks, open, create, move }) {
     </section>
   );
 }
-function Reports({ overview, tasks, sprints }) {
+function Reports({ overview, tasks, sprints, token, projectId }) {
+  const [reportData, setReportData] = useState(null);
+  useEffect(() => {
+    viraApi
+      .reports(token, projectId)
+      .then(setReportData)
+      .catch(() => setReportData(null));
+  }, [token, projectId]);
   const total = tasks.length || 1;
   const statusRows = Object.entries(STATUS)
     .map(([status, [label, color]]) => ({
@@ -511,11 +693,71 @@ function Reports({ overview, tasks, sprints }) {
           )}
         </article>
       </div>
+      {reportData && (
+        <div className="report-grid">
+          <article className="card report-detail">
+            <h2>Velocity sprint</h2>
+            <p>Task và story point hoàn thành theo sprint.</p>
+            {reportData.velocity.length ? (
+              reportData.velocity.map((item) => (
+                <div className="report-bar" key={item.sprintId}>
+                  <span>{item.sprintName}</span>
+                  <b>
+                    {item.completedTasks} task · {item.completedStoryPoints} SP
+                  </b>
+                </div>
+              ))
+            ) : (
+              <Empty message="Chưa có sprint hoàn tất." />
+            )}
+          </article>
+          <article className="card report-detail">
+            <h2>Tải thành viên</h2>
+            <p>Task đang mở và giờ ước tính.</p>
+            {reportData.memberWorkload.length ? (
+              reportData.memberWorkload.map((item) => (
+                <div className="report-bar" key={item.userId}>
+                  <span>{item.fullName}</span>
+                  <b>
+                    {item.openTasks} task · {item.estimatedHours} giờ
+                  </b>
+                </div>
+              ))
+            ) : (
+              <Empty message="Chưa có công việc được phân công." />
+            )}
+          </article>
+          <article className="card report-detail">
+            <h2>Lỗi theo mức độ</h2>
+            <p>Các bug chưa hoàn thành.</p>
+            {reportData.bugSeverity.map((item) => (
+              <div className="report-bar" key={item.severity}>
+                <span>{item.severity}</span>
+                <b>{item.count}</b>
+              </div>
+            ))}
+          </article>
+          <article className="card report-detail">
+            <h2>Burndown</h2>
+            <p>Công việc còn lại theo ngày.</p>
+            {reportData.burndown.length ? (
+              reportData.burndown.slice(-7).map((item) => (
+                <div className="report-bar" key={item.date}>
+                  <span>{item.date}</span>
+                  <b>{item.value} còn lại</b>
+                </div>
+              ))
+            ) : (
+              <Empty message="Chưa đủ dữ liệu tiến độ." />
+            )}
+          </article>
+        </div>
+      )}
     </section>
   );
 }
 
-function ProjectSettings({ token, project, saved }) {
+function ProjectSettings({ token, project, saved, restored, archived }) {
   const [form, setForm] = useState({
     name: project.name,
     description: project.description || "",
@@ -526,6 +768,8 @@ function ProjectSettings({ token, project, saved }) {
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletedTasks, setDeletedTasks] = useState([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
   const submit = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -542,6 +786,46 @@ function ProjectSettings({ token, project, saved }) {
       setError(errorText(err));
     } finally {
       setSaving(false);
+    }
+  };
+  const loadDeleted = async () => {
+    setLoadingDeleted(true);
+    try {
+      setDeletedTasks(await viraApi.deletedTasks(token, project.id));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setLoadingDeleted(false);
+    }
+  };
+  const restoreTask = async (task) => {
+    try {
+      const next = await viraApi.restoreTask(
+        token,
+        project.id,
+        task.id,
+        task.version,
+      );
+      setDeletedTasks((current) =>
+        current.filter((item) => item.id !== task.id),
+      );
+      restored(next);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const archiveProject = async () => {
+    if (
+      !window.confirm(
+        `Lưu trữ dự án “${project.name}”? Bạn có thể khôi phục lại sau.`,
+      )
+    )
+      return;
+    try {
+      await viraApi.archiveProject(token, project.id);
+      archived();
+    } catch (err) {
+      setError(errorText(err));
     }
   };
   return (
@@ -619,6 +903,52 @@ function ProjectSettings({ token, project, saved }) {
           </button>
         </div>
       </form>
+      <section className="card archive-panel">
+        <div className="section-title">
+          <div>
+            <h2>Khôi phục công việc</h2>
+            <p>Xem và khôi phục các task đã xóa mềm.</p>
+          </div>
+          <button
+            className="btn secondary"
+            onClick={loadDeleted}
+            disabled={loadingDeleted}
+          >
+            {loadingDeleted ? "Đang tải..." : "Tải task đã xóa"}
+          </button>
+        </div>
+        {deletedTasks.map((task) => (
+          <div className="entity-row" key={task.id}>
+            <div>
+              <b>
+                {task.taskCode} · {task.title}
+              </b>
+              <span>Đã xóa · phiên bản {task.version}</span>
+            </div>
+            <button className="btn secondary" onClick={() => restoreTask(task)}>
+              Khôi phục
+            </button>
+          </div>
+        ))}
+        {!loadingDeleted && deletedTasks.length === 0 && (
+          <p className="archive-note">
+            Chọn “Tải task đã xóa” để kiểm tra danh sách.
+          </p>
+        )}
+      </section>
+      <section className="card archive-panel danger-panel">
+        <h2>Lưu trữ dự án</h2>
+        <p>
+          Project sẽ ẩn khỏi danh sách hoạt động; dữ liệu vẫn được giữ và có thể
+          khôi phục ở màn hình workspace.
+        </p>
+        <button
+          className="btn secondary danger-button"
+          onClick={archiveProject}
+        >
+          Lưu trữ dự án
+        </button>
+      </section>
     </section>
   );
 }
@@ -676,11 +1006,25 @@ function TaskModal({ task, close, update }) {
     </div>
   );
 }
-function TaskDetails({ task, close, update, token, projectId, sprints }) {
+function TaskDetails({
+  task,
+  close,
+  update,
+  token,
+  projectId,
+  sprints,
+  tasks,
+}) {
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [collaboration, setCollaboration] = useState(null);
   const [members, setMembers] = useState([]);
+  const [labels, setLabels] = useState([]);
+  const [taskLabels, setTaskLabels] = useState([]);
+  const [taskLinks, setTaskLinks] = useState([]);
+  const [activity, setActivity] = useState([]);
+  const [linkTargetId, setLinkTargetId] = useState("");
+  const [linkType, setLinkType] = useState("RELATES_TO");
   const [bug, setBug] = useState({
     environment: "",
     severity: "MEDIUM",
@@ -694,17 +1038,33 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
   const load = useCallback(async () => {
     if (!task) return;
     try {
-      const [nextComments, nextAttachments, nextCollaboration, nextMembers] =
-        await Promise.all([
-          viraApi.comments(token, projectId, task.id),
-          viraApi.attachments(token, projectId, task.id),
-          viraApi.taskCollaboration(token, projectId, task.id),
-          viraApi.members(token, projectId),
-        ]);
+      const [
+        nextComments,
+        nextAttachments,
+        nextCollaboration,
+        nextMembers,
+        nextLabels,
+        nextTaskLabels,
+        nextTaskLinks,
+        nextActivity,
+      ] = await Promise.all([
+        viraApi.comments(token, projectId, task.id),
+        viraApi.attachments(token, projectId, task.id),
+        viraApi.taskCollaboration(token, projectId, task.id),
+        viraApi.members(token, projectId),
+        viraApi.labels(token, projectId),
+        viraApi.taskLabels(token, projectId, task.id),
+        viraApi.taskLinks(token, projectId, task.id),
+        viraApi.taskActivity(token, projectId, task.id),
+      ]);
       setComments(nextComments);
       setAttachments(nextAttachments);
       setCollaboration(nextCollaboration);
       setMembers(nextMembers);
+      setLabels(nextLabels);
+      setTaskLabels(nextTaskLabels);
+      setTaskLinks(nextTaskLinks);
+      setActivity(nextActivity);
       if (task.taskType === "BUG")
         setBug(await viraApi.bug(token, projectId, task.id));
     } catch (err) {
@@ -784,6 +1144,44 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
     changeCollaboration(() =>
       viraApi.updateTaskAssignees(token, projectId, task.id, nextIds),
     );
+  };
+  const toggleLabel = async (labelId) => {
+    const ids = taskLabels.map((label) => label.id);
+    try {
+      setTaskLabels(
+        await viraApi.updateTaskLabels(
+          token,
+          projectId,
+          task.id,
+          ids.includes(labelId)
+            ? ids.filter((id) => id !== labelId)
+            : [...ids, labelId],
+        ),
+      );
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const addLink = async () => {
+    if (!linkTargetId) return;
+    try {
+      await viraApi.addTaskLink(token, projectId, task.id, {
+        targetTaskId: Number(linkTargetId),
+        linkType,
+      });
+      setLinkTargetId("");
+      setTaskLinks(await viraApi.taskLinks(token, projectId, task.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const removeLink = async (linkId) => {
+    try {
+      await viraApi.removeTaskLink(token, projectId, task.id, linkId);
+      setTaskLinks(await viraApi.taskLinks(token, projectId, task.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
   };
   return (
     <div className="modal-layer" role="dialog" aria-modal="true">
@@ -881,6 +1279,19 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
                 {item.originalName} · {Math.ceil(item.fileSize / 1024)} KB
               </button>
             ))}
+            <h3>Lịch sử công việc</h3>
+            <div className="audit-list compact-audit">
+              {activity.slice(0, 8).map((item) => (
+                <div key={item.id} className="audit-item">
+                  <b>{item.actorName}</b>
+                  <span>{item.action.replaceAll("_", " ")}</span>
+                  <time>
+                    {new Date(item.createdAt).toLocaleString("vi-VN")}
+                  </time>
+                </div>
+              ))}
+              {!activity.length && <p>Chưa có lịch sử thao tác.</p>}
+            </div>
             {task.taskType === "BUG" && (
               <>
                 <h3>Thông tin lỗi</h3>
@@ -933,6 +1344,87 @@ function TaskDetails({ task, close, update, token, projectId, sprints }) {
             )}
           </div>
           <aside className="task-meta">
+            <div className="task-participants">
+              <span>Nhãn</span>
+              <div className="task-labels">
+                {taskLabels.map((label) => (
+                  <i key={label.id} style={{ background: label.color }}>
+                    {label.name}
+                  </i>
+                ))}
+                {!taskLabels.length && <p>Chưa có nhãn</p>}
+              </div>
+              <details className="participant-picker">
+                <summary>Chỉnh nhãn</summary>
+                {labels.map((label) => (
+                  <label key={label.id}>
+                    <input
+                      type="checkbox"
+                      checked={taskLabels.some((item) => item.id === label.id)}
+                      onChange={() => toggleLabel(label.id)}
+                    />{" "}
+                    <i
+                      className="label-dot"
+                      style={{ background: label.color }}
+                    />
+                    {label.name}
+                  </label>
+                ))}
+              </details>
+            </div>
+            <div className="task-participants">
+              <span>Liên kết ({taskLinks.length})</span>
+              <div className="task-link-list">
+                {taskLinks.map((link) => (
+                  <div key={link.id} className="task-link-item">
+                    <span>
+                      {link.linkType}: {link.targetTaskCode} ·{" "}
+                      {link.targetTaskTitle}
+                    </span>
+                    <button
+                      className="icon-btn compact-icon"
+                      aria-label={`Gỡ liên kết ${link.targetTaskCode}`}
+                      onClick={() => removeLink(link.id)}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {!taskLinks.length && <p>Chưa có liên kết</p>}
+              </div>
+              <div className="task-link-form">
+                <select
+                  aria-label="Loại liên kết"
+                  value={linkType}
+                  onChange={(event) => setLinkType(event.target.value)}
+                >
+                  <option value="RELATES_TO">Liên quan</option>
+                  <option value="BLOCKS">Chặn</option>
+                  <option value="DUPLICATES">Trùng lặp</option>
+                </select>
+                <select
+                  aria-label="Công việc cần liên kết"
+                  value={linkTargetId}
+                  onChange={(event) => setLinkTargetId(event.target.value)}
+                >
+                  <option value="">Chọn công việc</option>
+                  {tasks
+                    .filter((item) => item.id !== task.id)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.taskCode} · {item.title}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  className="btn secondary"
+                  onClick={addLink}
+                  disabled={!linkTargetId}
+                >
+                  <Plus size={14} /> Liên kết
+                </button>
+              </div>
+            </div>
             {collaboration && (
               <div className="task-participants">
                 <span>Người thực hiện</span>
@@ -1651,6 +2143,349 @@ function Setup({ token, user, ready }) {
   );
 }
 
+function AuditPage({ token, project }) {
+  const [items, setItems] = useState([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    viraApi
+      .projectActivity(token, project.id)
+      .then(setItems)
+      .catch((err) => setError(errorText(err)));
+  }, [token, project.id]);
+  return (
+    <section>
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">KIỂM SOÁT</p>
+          <h1>Lịch sử dự án</h1>
+          <p>Theo dõi các thay đổi quan trọng trong project và công việc.</p>
+        </div>
+      </div>
+      <div className="card audit-page">
+        {error && <p className="form-error">{error}</p>}
+        <div className="audit-list">
+          {items.map((item) => (
+            <article className="audit-item" key={item.id}>
+              <div className="audit-marker" aria-hidden="true" />
+              <div>
+                <b>{item.actorName}</b>
+                <p>
+                  {item.action.replaceAll("_", " ")}
+                  {item.taskCode ? ` · ${item.taskCode}` : ""}
+                </p>
+                <time>{new Date(item.createdAt).toLocaleString("vi-VN")}</time>
+              </div>
+            </article>
+          ))}
+          {!items.length && !error && (
+            <p>Chưa có thao tác nào được ghi nhận.</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProfilePage({ token, session, onSession }) {
+  const [profile, setProfile] = useState(null);
+  const [form, setForm] = useState({ fullName: "", avatarUrl: "" });
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    viraApi
+      .profile(token)
+      .then((value) => {
+        setProfile(value);
+        setForm({ fullName: value.fullName, avatarUrl: value.avatarUrl || "" });
+      })
+      .catch((err) => setError(errorText(err)));
+  }, [token]);
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      const next = await viraApi.updateProfile(token, form);
+      setProfile(next);
+      const nextSession = { ...session, user: { ...session.user, ...next } };
+      localStorage.setItem("vira.session", JSON.stringify(nextSession));
+      onSession(nextSession);
+      setMessage("Đã lưu hồ sơ.");
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const changePassword = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      await viraApi.changePassword(token, passwords);
+      setPasswords({ currentPassword: "", newPassword: "" });
+      setMessage("Đã đổi mật khẩu.");
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  return (
+    <section>
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">TÀI KHOẢN</p>
+          <h1>Hồ sơ cá nhân</h1>
+          <p>Quản lý thông tin và bảo mật tài khoản.</p>
+        </div>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      {message && <p className="form-success">{message}</p>}
+      <div className="profile-grid">
+        <form className="card settings-form" onSubmit={saveProfile}>
+          <h2>Thông tin hồ sơ</h2>
+          <label>
+            Email
+            <input value={profile?.email || ""} readOnly aria-readonly="true" />
+          </label>
+          <label>
+            Họ và tên
+            <input
+              required
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            />
+          </label>
+          <label>
+            URL ảnh đại diện
+            <input
+              type="url"
+              value={form.avatarUrl}
+              onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
+            />
+          </label>
+          <button className="btn primary">Lưu hồ sơ</button>
+        </form>
+        <form className="card settings-form" onSubmit={changePassword}>
+          <h2>Đổi mật khẩu</h2>
+          <label>
+            Mật khẩu hiện tại
+            <input
+              required
+              type={showPassword ? "text" : "password"}
+              value={passwords.currentPassword}
+              onChange={(e) =>
+                setPasswords({ ...passwords, currentPassword: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Mật khẩu mới (ít nhất 8 ký tự)
+            <div className="password-field">
+              <input
+                required
+                minLength="8"
+                type={showPassword ? "text" : "password"}
+                value={passwords.newPassword}
+                onChange={(e) =>
+                  setPasswords({ ...passwords, newPassword: e.target.value })
+                }
+              />
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+          </label>
+          <button className="btn primary">Đổi mật khẩu</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
+  const [projects, setProjects] = useState([]);
+  const [archived, setArchived] = useState([]);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    try {
+      const [active, archivedItems] = await Promise.all([
+        viraApi.projects(token, workspace.id),
+        viraApi.archivedProjects(token, workspace.id),
+      ]);
+      setProjects(active);
+      setArchived(archivedItems);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [token, workspace.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const restore = async (item) => {
+    try {
+      selectProject(await viraApi.restoreProject(token, item.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  return (
+    <main className="auth-page workspace-home">
+      <section className="auth-card wide-card">
+        <div className="brand">
+          <div className="brand-mark">V</div>
+          <span>vira</span>
+        </div>
+        <p className="eyebrow">KHÔNG GIAN LÀM VIỆC</p>
+        <h1>{workspace.name}</h1>
+        <p>Chọn dự án để tiếp tục hoặc khôi phục dự án đã lưu trữ.</p>
+        {error && <p className="form-error">{error}</p>}
+        <div className="project-choice-list">
+          {projects.map((item) => (
+            <button key={item.id} onClick={() => selectProject(item)}>
+              <b>
+                {item.projectKey} · {item.name}
+              </b>
+              <span>{item.projectType}</span>
+            </button>
+          ))}
+          {!projects.length && <p>Chưa có dự án hoạt động.</p>}
+        </div>
+        {archived.length > 0 && (
+          <>
+            <h2 className="archived-heading">Dự án đã lưu trữ</h2>
+            <div className="project-choice-list">
+              {archived.map((item) => (
+                <div className="archived-project" key={item.id}>
+                  <div>
+                    <b>
+                      {item.projectKey} · {item.name}
+                    </b>
+                    <span>Đã lưu trữ</span>
+                  </div>
+                  <button
+                    className="btn secondary"
+                    onClick={() => restore(item)}
+                  >
+                    Khôi phục
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <button className="text-danger-btn" onClick={archiveWorkspace}>
+          Lưu trữ workspace này
+        </button>
+      </section>
+    </main>
+  );
+}
+
+function WorkspaceLanding({ token, chooseWorkspace }) {
+  const [active, setActive] = useState([]);
+  const [archived, setArchived] = useState([]);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    try {
+      const [current, old] = await Promise.all([
+        viraApi.workspaces(token),
+        viraApi.archivedWorkspaces(token),
+      ]);
+      setActive(current);
+      setArchived(old);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [token]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const create = async (event) => {
+    event.preventDefault();
+    try {
+      chooseWorkspace(
+        await viraApi.createWorkspace(token, { name, description: "" }),
+      );
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  const restore = async (item) => {
+    try {
+      chooseWorkspace(await viraApi.restoreWorkspace(token, item.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+  return (
+    <main className="auth-page workspace-home">
+      <section className="auth-card wide-card">
+        <div className="brand">
+          <div className="brand-mark">V</div>
+          <span>vira</span>
+        </div>
+        <p className="eyebrow">KHÔNG GIAN LÀM VIỆC</p>
+        <h1>Chọn không gian làm việc</h1>
+        <p>
+          Chọn workspace đang hoạt động hoặc khôi phục workspace đã lưu trữ.
+        </p>
+        {error && <p className="form-error">{error}</p>}
+        <div className="project-choice-list">
+          {active.map((item) => (
+            <button key={item.id} onClick={() => chooseWorkspace(item)}>
+              <b>{item.name}</b>
+              <span>Workspace đang hoạt động</span>
+            </button>
+          ))}
+          {!active.length && <p>Chưa có workspace hoạt động.</p>}
+        </div>
+        {archived.length > 0 && (
+          <>
+            <h2 className="archived-heading">Workspace đã lưu trữ</h2>
+            <div className="project-choice-list">
+              {archived.map((item) => (
+                <div className="archived-project" key={item.id}>
+                  <div>
+                    <b>{item.name}</b>
+                    <span>Đã lưu trữ</span>
+                  </div>
+                  <button
+                    className="btn secondary"
+                    onClick={() => restore(item)}
+                  >
+                    Khôi phục
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <form className="create-workspace-form" onSubmit={create}>
+          <label>
+            Tạo workspace mới
+            <input
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Tên workspace"
+            />
+          </label>
+          <button className="btn primary">Tạo</button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
 function App() {
   const [session, setSession] = useState(() =>
     JSON.parse(localStorage.getItem("vira.session") || "null"),
@@ -1783,6 +2618,17 @@ function App() {
       setError(errorText(err));
     }
   };
+  const chooseWorkspace = async (nextWorkspace) => {
+    setWorkspace(nextWorkspace);
+    const projects = await viraApi.projects(
+      session.accessToken,
+      nextWorkspace.id,
+    );
+    if (projects.length) {
+      setProject(projects[0]);
+      await loadProject(session.accessToken, projects[0]);
+    } else setProject(null);
+  };
   if (!session) return <Auth authenticated={authenticated} />;
   if (loading)
     return (
@@ -1791,9 +2637,33 @@ function App() {
         <p>Đang kết nối dữ liệu dự án...</p>
       </main>
     );
-  if (!workspace || !project)
+  if (!workspace)
     return (
-      <Setup token={session.accessToken} user={session.user} ready={ready} />
+      <WorkspaceLanding
+        token={session.accessToken}
+        chooseWorkspace={chooseWorkspace}
+      />
+    );
+  if (!project)
+    return (
+      <WorkspaceHome
+        token={session.accessToken}
+        workspace={workspace}
+        selectProject={async (item) => {
+          setProject(item);
+          await loadProject(session.accessToken, item);
+        }}
+        archiveWorkspace={async () => {
+          if (!window.confirm(`Lưu trữ workspace “${workspace.name}”?`)) return;
+          try {
+            await viraApi.archiveWorkspace(session.accessToken, workspace.id);
+            setProject(null);
+            setWorkspace(null);
+          } catch (err) {
+            setError(errorText(err));
+          }
+        }}
+      />
     );
   const content =
     page === "Tổng quan" ? (
@@ -1804,13 +2674,21 @@ function App() {
         create={setCreating}
       />
     ) : page === "Bảng công việc" ? (
-      <Board tasks={tasks} open={setSelected} create={setCreating} />
+      <Board
+        tasks={tasks}
+        open={setSelected}
+        create={setCreating}
+        token={session.accessToken}
+        projectId={project.id}
+      />
     ) : page === "Backlog" ? (
       <Backlog
         tasks={tasks}
         open={setSelected}
         create={setCreating}
         move={moveBacklogTask}
+        token={session.accessToken}
+        projectId={project.id}
       />
     ) : page === "Sprint" ? (
       <SprintPage
@@ -1822,14 +2700,34 @@ function App() {
       />
     ) : page === "Thành viên" ? (
       <MembersPage token={session.accessToken} project={project} />
+    ) : page === "Lịch sử" ? (
+      <AuditPage token={session.accessToken} project={project} />
+    ) : page === "Hồ sơ" ? (
+      <ProfilePage
+        token={session.accessToken}
+        session={session}
+        onSession={setSession}
+      />
     ) : page === "Cài đặt dự án" ? (
       <ProjectSettings
         token={session.accessToken}
         project={project}
         saved={setProject}
+        restored={(task) =>
+          setTasks((current) =>
+            [...current, task].sort((a, b) => a.position - b.position),
+          )
+        }
+        archived={() => setProject(null)}
       />
     ) : (
-      <Reports overview={overview} tasks={tasks} sprints={sprints} />
+      <Reports
+        overview={overview}
+        tasks={tasks}
+        sprints={sprints}
+        token={session.accessToken}
+        projectId={project.id}
+      />
     );
   return (
     <div className="app-shell">
@@ -1873,9 +2771,9 @@ function App() {
             <FolderKanban size={18} />
             {project.projectKey}
           </button>
-          <button>
+          <button onClick={() => setPage("Hồ sơ")}>
             <Settings size={18} />
-            Cài đặt dự án
+            Hồ sơ cá nhân
           </button>
           <div className="user-card">
             <Avatar text={initials(session.user.fullName)} />
@@ -1976,6 +2874,7 @@ function App() {
         token={session.accessToken}
         projectId={project.id}
         sprints={sprints}
+        tasks={tasks}
       />
       {creating && (
         <TaskForm

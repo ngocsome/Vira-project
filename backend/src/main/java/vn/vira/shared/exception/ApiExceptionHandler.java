@@ -52,6 +52,13 @@ public class ApiExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "Thông tin đăng nhập không chính xác hoặc phiên đã hết hạn");
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRateLimit(RateLimitExceededException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "60")
+                .body(new ApiResponse<>(false, null, exception.getMessage(), Instant.now()));
+    }
+
     private ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message) {
         return ResponseEntity.status(status)
                 .body(new ApiResponse<>(false, null, message, Instant.now()));

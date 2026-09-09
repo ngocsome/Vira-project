@@ -13,4 +13,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
             order by w.updatedAt desc
             """)
     List<Workspace> findActiveByMemberId(Long userId);
+
+    @Query("select w from Workspace w join WorkspaceMember member on member.workspace.id = w.id where member.user.id = :userId and w.archivedAt is not null order by w.updatedAt desc")
+    List<Workspace> findArchivedByMemberId(Long userId);
 }

@@ -29,6 +29,15 @@ public class TaskController {
         return ApiResponse.ok(taskService.findByProject(projectId), "Lấy danh sách công việc thành công");
     }
 
+    @GetMapping("/search")
+    public ApiResponse<TaskPageResponse> search(@PathVariable Long projectId, @RequestParam(required = false) String q, @RequestParam(required = false) vn.vira.task.domain.TaskStatus status, @RequestParam(required = false) vn.vira.task.domain.TaskPriority priority, @RequestParam(required = false) Long assigneeId, @RequestParam(required = false) Long sprintId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "30") int size) {
+        return ApiResponse.ok(taskService.search(projectId, q, status, priority, assigneeId, sprintId, page, size), "Tìm kiếm công việc thành công");
+    }
+
+    @GetMapping("/filters") public ApiResponse<List<SavedFilterResponse>> filters(@PathVariable Long projectId) { return ApiResponse.ok(taskService.filters(projectId), "Lấy bộ lọc đã lưu thành công"); }
+    @PostMapping("/filters") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<SavedFilterResponse> saveFilter(@PathVariable Long projectId, @Valid @RequestBody SavedFilterRequest request) { return ApiResponse.ok(taskService.saveFilter(projectId, request), "Lưu bộ lọc thành công"); }
+    @DeleteMapping("/filters/{filterId}") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteFilter(@PathVariable Long projectId, @PathVariable Long filterId) { taskService.deleteFilter(projectId, filterId); }
+
     @GetMapping("/backlog")
     public ApiResponse<List<TaskResponse>> findBacklog(@PathVariable Long projectId) {
         return ApiResponse.ok(taskService.findBacklog(projectId), "Lấy Backlog thành công");

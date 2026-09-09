@@ -47,6 +47,8 @@ public class WorkspaceService {
                 .map(this::toResponse)
                 .toList();
     }
+    @Transactional(readOnly = true)
+    public List<WorkspaceResponse> findArchived() { return workspaceRepository.findArchivedByMemberId(currentUser.id()).stream().map(this::toResponse).toList(); }
 
     @Transactional(readOnly = true)
     public Workspace requireMember(Long workspaceId) {
@@ -74,6 +76,8 @@ public class WorkspaceService {
         workspace.setArchivedAt(Instant.now());
         return toResponse(workspace);
     }
+    @Transactional
+    public WorkspaceResponse restore(Long workspaceId) { Workspace workspace=requireOwner(workspaceId); workspace.setArchivedAt(null); return toResponse(workspace); }
 
     private Workspace requireOwner(Long workspaceId) {
         Workspace workspace = requireMember(workspaceId);

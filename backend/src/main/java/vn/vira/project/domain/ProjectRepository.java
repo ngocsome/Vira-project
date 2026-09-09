@@ -10,5 +10,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     List<Project> findByWorkspaceIdAndArchivedAtIsNullOrderByUpdatedAtDesc(Long workspaceId);
 
+    List<Project> findByWorkspaceIdAndArchivedAtIsNotNullOrderByUpdatedAtDesc(Long workspaceId);
+
     Optional<Project> findByIdAndArchivedAtIsNull(Long id);
 }

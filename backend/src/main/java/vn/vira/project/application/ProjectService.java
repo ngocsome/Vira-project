@@ -21,6 +21,7 @@ import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
 import vn.vira.workspace.application.WorkspaceService;
 import vn.vira.workspace.domain.Workspace;
+import vn.vira.audit.application.ActivityLogService;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class ProjectService {
     private final CurrentUser currentUser;
     private final ProjectMapper projectMapper;
     private final BoardService boardService;
+    private final ActivityLogService activityLogs;
 
     @Transactional
     public ProjectResponse create(Long workspaceId, CreateProjectRequest request) {
@@ -65,6 +67,7 @@ public class ProjectService {
 
         projectMemberRepository.save(new ProjectMember(project, owner, ProjectRole.OWNER));
         boardService.createDefaultBoard(project);
+        activityLogs.recordProject(project, "PROJECT_CREATED", "Tạo dự án");
         return projectMapper.toResponse(project);
     }
 
@@ -77,6 +80,8 @@ public class ProjectService {
                 .map(projectMapper::toResponse)
                 .toList();
     }
+    @Transactional(readOnly = true)
+    public List<ProjectResponse> findArchivedByWorkspace(Long workspaceId) { workspaceService.requireMember(workspaceId); return projectRepository.findByWorkspaceIdAndArchivedAtIsNotNullOrderByUpdatedAtDesc(workspaceId).stream().map(projectMapper::toResponse).toList(); }
 
     @Transactional(readOnly = true)
     public ProjectResponse findOne(Long projectId) {
@@ -95,6 +100,7 @@ public class ProjectService {
         project.setStatus(request.status());
         project.setStartDate(request.startDate());
         project.setTargetEndDate(request.targetEndDate());
+        activityLogs.recordProject(project, "PROJECT_UPDATED", "Cập nhật cấu hình dự án");
         return projectMapper.toResponse(project);
     }
 
@@ -102,6 +108,16 @@ public class ProjectService {
     public ProjectResponse archive(Long projectId) {
         Project project = requireOwner(projectId);
         project.setArchivedAt(Instant.now());
+        activityLogs.recordProject(project, "PROJECT_ARCHIVED", "Lưu trữ dự án");
+        return projectMapper.toResponse(project);
+    }
+    @Transactional
+    public ProjectResponse restore(Long projectId) {
+        Project project = projectRepository.findById(projectId).orElseThrow(() -> new NotFoundException("Không tìm thấy dự án"));
+        workspaceService.requireMember(project.getWorkspace().getId());
+        if (!project.getOwner().getId().equals(currentUser.id())) throw new org.springframework.security.access.AccessDeniedException("Chỉ chủ sở hữu mới có thể khôi phục dự án");
+        project.setArchivedAt(null);
+        activityLogs.recordProject(project, "PROJECT_RESTORED", "Khôi phục dự án");
         return projectMapper.toResponse(project);
     }
 

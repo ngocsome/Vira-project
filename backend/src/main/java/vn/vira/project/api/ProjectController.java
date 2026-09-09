@@ -32,6 +32,7 @@ public class ProjectController {
     public ApiResponse<List<ProjectResponse>> findByWorkspace(@PathVariable Long workspaceId) {
         return ApiResponse.ok(projectService.findByWorkspace(workspaceId), "Lấy danh sách dự án thành công");
     }
+    @GetMapping("/workspaces/{workspaceId}/projects/archived") public ApiResponse<List<ProjectResponse>> archived(@PathVariable Long workspaceId) { return ApiResponse.ok(projectService.findArchivedByWorkspace(workspaceId), "Lấy dự án đã lưu trữ thành công"); }
 
     @PostMapping("/workspaces/{workspaceId}/projects")
     @ResponseStatus(HttpStatus.CREATED)
@@ -51,4 +52,5 @@ public class ProjectController {
     public ApiResponse<ProjectResponse> archive(@PathVariable Long projectId) {
         return ApiResponse.ok(projectService.archive(projectId), "Lưu trữ dự án thành công");
     }
+    @PatchMapping("/projects/{projectId}/restore") public ApiResponse<ProjectResponse> restore(@PathVariable Long projectId) { return ApiResponse.ok(projectService.restore(projectId), "Khôi phục dự án thành công"); }
 }

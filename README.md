@@ -61,9 +61,12 @@ npm run dev -- --host 0.0.0.0
 | REST API | http://localhost:8080/api/v1 |
 | Health | http://localhost:8080/api/v1/actuator/health |
 | Mailpit | http://localhost:8025 |
+| Swagger UI | http://localhost:8080/api/v1/swagger-ui/index.html |
 | MySQL host port | `localhost:3307` |
 
 Để dừng các container mà vẫn giữ dữ liệu: `docker compose down`. Chỉ dùng `docker compose down -v` khi muốn xóa toàn bộ dữ liệu local.
+
+Sao lưu MySQL: `cd backend; .\scripts\backup-mysql.ps1`. Khôi phục: `cd backend; .\scripts\restore-mysql.ps1 -BackupFile .\backups\vira-YYYYMMDD-HHMMSS.sql`. Sao lưu tệp đính kèm: `cd backend; .\scripts\backup-uploads.ps1`; khôi phục: `cd backend; .\scripts\restore-uploads.ps1 -BackupFile .\backups\vira-uploads-YYYYMMDD-HHMMSS.zip`. Khi khôi phục môi trường, dùng cả backup MySQL và backup upload cùng mốc thời gian. Các script restore đều yêu cầu gõ `RESTORE` trước khi ghi dữ liệu.
 
 ## Tài khoản và phân quyền
 

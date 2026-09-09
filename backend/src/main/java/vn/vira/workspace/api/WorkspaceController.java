@@ -27,6 +27,7 @@ public class WorkspaceController {
     public ApiResponse<List<WorkspaceResponse>> findMyWorkspaces() {
         return ApiResponse.ok(workspaceService.findMyWorkspaces(), "Lấy danh sách không gian làm việc thành công");
     }
+    @GetMapping("/archived") public ApiResponse<List<WorkspaceResponse>> archived() { return ApiResponse.ok(workspaceService.findArchived(), "Lấy không gian đã lưu trữ thành công"); }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -43,4 +44,5 @@ public class WorkspaceController {
     public ApiResponse<WorkspaceResponse> archive(@PathVariable Long workspaceId) {
         return ApiResponse.ok(workspaceService.archive(workspaceId), "Lưu trữ không gian làm việc thành công");
     }
+    @PatchMapping("/{workspaceId}/restore") public ApiResponse<WorkspaceResponse> restore(@PathVariable Long workspaceId) { return ApiResponse.ok(workspaceService.restore(workspaceId), "Khôi phục không gian làm việc thành công"); }
 }

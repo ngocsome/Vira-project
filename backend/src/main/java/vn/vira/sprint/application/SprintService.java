@@ -24,7 +24,7 @@ public class SprintService {
 
     @Transactional
     public SprintResponse create(Long projectId, CreateSprintRequest request) {
-        Project project = projectService.requireMember(projectId);
+        Project project = projectService.requireManager(projectId);
 
         if (request.endDate().isBefore(request.startDate())) {
             throw new BusinessException("Ngày kết thúc Sprint không được sớm hơn ngày bắt đầu");
@@ -43,7 +43,7 @@ public class SprintService {
 
     @Transactional(readOnly = true)
     public List<SprintResponse> findByProject(Long projectId) {
-        projectService.requireMember(projectId);
+        projectService.requireManager(projectId);
 
         return sprintRepository.findByProjectIdOrderByStartDateDesc(projectId)
                 .stream()
@@ -53,7 +53,7 @@ public class SprintService {
 
     @Transactional
     public SprintResponse start(Long projectId, Long sprintId) {
-        projectService.requireMember(projectId);
+        projectService.requireManager(projectId);
 
         if (sprintRepository.findByProjectIdAndStatus(projectId, SprintStatus.ACTIVE).isPresent()) {
             throw new BusinessException("Mỗi dự án chỉ có thể có một Sprint đang diễn ra");

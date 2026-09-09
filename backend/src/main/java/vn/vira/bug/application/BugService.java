@@ -13,6 +13,7 @@ import vn.vira.shared.exception.NotFoundException;
 import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.task.domain.TaskType;
+import vn.vira.task.application.TaskAuthorizationService;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +22,14 @@ public class BugService {
     private final BugRepository bugRepository;
     private final TaskRepository taskRepository;
     private final ProjectService projectService;
+    private final TaskAuthorizationService taskAuthorizationService;
 
     @Transactional
     public BugResponse upsert(Long projectId, Long taskId, UpsertBugRequest request) {
         projectService.requireMember(projectId);
         Task task = taskRepository.findByIdAndProjectIdAndDeletedAtIsNull(taskId, projectId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy công việc"));
+        taskAuthorizationService.requireTaskEditor(task);
 
         if (task.getTaskType() != TaskType.BUG) {
             throw new BusinessException("Chỉ công việc loại BUG mới có thông tin lỗi chi tiết");
