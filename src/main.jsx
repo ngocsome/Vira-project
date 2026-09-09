@@ -757,6 +757,20 @@ function Reports({ overview, tasks, sprints, token, projectId }) {
   );
 }
 
+function LabelManager({ token, projectId }) {
+  const [labels, setLabels] = useState([]);
+  const [draft, setDraft] = useState({ name: "", color: "#2563eb" });
+  const [editing, setEditing] = useState(null);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const load = useCallback(async () => { try { setLabels(await viraApi.labels(token, projectId)); } catch (err) { setError(errorText(err)); } }, [token, projectId]);
+  useEffect(() => { load(); }, [load]);
+  const save = async (event) => { event.preventDefault(); setError(""); try { if (editing) await viraApi.updateLabel(token, projectId, editing.id, draft); else await viraApi.createLabel(token, projectId, draft); setDraft({ name: "", color: "#2563eb" }); setEditing(null); setMessage("Đã lưu nhãn."); await load(); } catch (err) { setError(errorText(err)); } };
+  const edit = (label) => { setEditing(label); setDraft({ name: label.name, color: label.color }); setMessage(""); };
+  const remove = async (label) => { if (!window.confirm(`Xóa nhãn “${label.name}” khỏi toàn bộ task?`)) return; try { await viraApi.deleteLabel(token, projectId, label.id); setMessage("Đã xóa nhãn."); await load(); } catch (err) { setError(errorText(err)); } };
+  return <section className="card archive-panel label-manager"><div className="section-title"><div><h2>Quản trị nhãn</h2><p>Tạo, sửa hoặc xóa nhãn của project.</p></div></div>{error && <p className="form-error">{error}</p>}{message && <p className="form-success">{message}</p>}<form className="label-editor" onSubmit={save}><label>Tên nhãn<input required maxLength="80" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label><label>Màu<input type="color" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label><button className="btn secondary">{editing ? "Lưu nhãn" : "Tạo nhãn"}</button>{editing && <button className="btn secondary" type="button" onClick={() => { setEditing(null); setDraft({ name: "", color: "#2563eb" }); }}>Hủy</button>}</form><div className="label-admin-list">{labels.map((label) => <div key={label.id}><i style={{ background: label.color }} /> <b>{label.name}</b><button className="text-btn" onClick={() => edit(label)}>Sửa</button><button className="text-btn danger" onClick={() => remove(label)}>Xóa</button></div>)}{!labels.length && <p>Chưa có nhãn.</p>}</div></section>;
+}
+
 function ProjectSettings({ token, project, saved, restored, archived }) {
   const [form, setForm] = useState({
     name: project.name,
@@ -949,6 +963,7 @@ function ProjectSettings({ token, project, saved, restored, archived }) {
           Lưu trữ dự án
         </button>
       </section>
+      <LabelManager token={token} projectId={project.id} />
     </section>
   );
 }

@@ -150,6 +150,17 @@ export const viraApi = {
       token,
       body: label,
     }),
+  updateLabel: (token, projectId, labelId, label) =>
+    request(`/projects/${projectId}/labels/${labelId}`, {
+      method: "PUT",
+      token,
+      body: label,
+    }),
+  deleteLabel: (token, projectId, labelId) =>
+    request(`/projects/${projectId}/labels/${labelId}`, {
+      method: "DELETE",
+      token,
+    }),
   taskLabels: (token, projectId, taskId) =>
     request(`/projects/${projectId}/tasks/${taskId}/labels`, { token }),
   updateTaskLabels: (token, projectId, taskId, labelIds) =>

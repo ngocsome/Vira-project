@@ -42,7 +42,9 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
-        rateLimiter.check("forgot-password", clientIp(httpRequest), 3, Duration.ofMinutes(15));
+        // Bind the throttle to both source IP and target email. This prevents abuse of one mailbox
+        // without letting unrelated users behind the same NAT block each other's reset flow.
+        rateLimiter.check("forgot-password", clientIp(httpRequest) + ":" + request.email().trim().toLowerCase(), 3, Duration.ofMinutes(15));
         passwordResetService.request(request);
         return ApiResponse.ok(null, "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi");
     }

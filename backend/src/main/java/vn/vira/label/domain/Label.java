@@ -22,4 +22,5 @@ public class Label {
     private String name;
     private String color;
     public Label(Project project, String name, String color) { this.project = project; this.name = name; this.color = color; }
+    public void update(String name, String color) { this.name = name; this.color = color; }
 }

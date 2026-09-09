@@ -20,6 +20,7 @@ import vn.vira.task.domain.SavedTaskFilterRepository;
 import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.task.domain.TaskStatus;
+import vn.vira.task.domain.TaskStatusHistoryRepository;
 import vn.vira.user.domain.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +36,7 @@ class TaskReorderTest {
     @Mock private ActivityLogService audit;
     @Mock private TaskNotificationService notifications;
     @Mock private SavedTaskFilterRepository filters;
+    @Mock private TaskStatusHistoryRepository statusHistory;
 
     @Test
     void reindexesEveryTaskToUniqueSequentialPositionsAfterMove() {
@@ -51,7 +53,7 @@ class TaskReorderTest {
         verify(moving).setPosition(3L);
     }
 
-    private TaskService service() { return new TaskService(tasks, counters, projects, users, currentUser, mapper, sprints, authorization, audit, notifications, filters); }
+    private TaskService service() { return new TaskService(tasks, counters, projects, users, currentUser, mapper, sprints, authorization, audit, notifications, filters, statusHistory); }
     private Task task(Long id) { Task task = mock(Task.class); when(task.getId()).thenReturn(id); return task; }
     private Task task(Long id, TaskStatus status) { Task task = mock(Task.class); when(task.getId()).thenReturn(id); when(task.getStatus()).thenReturn(status); return task; }
 }

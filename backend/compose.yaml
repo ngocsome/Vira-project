@@ -26,6 +26,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      redis:
+        condition: service_started
     environment:
       DB_URL: jdbc:mysql://mysql:3306/vira?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: vira_app
@@ -33,6 +35,7 @@ services:
       JWT_SECRET: change-this-production-jwt-secret-before-deploying-at-least-32-bytes
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
+      SPRING_DATA_REDIS_HOST: redis
     ports:
       - "8080:8080"
     volumes:
@@ -45,5 +48,13 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: vira-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vira_redis_data:/data
+
 volumes:
   vira_mysql_data:
+  vira_redis_data:

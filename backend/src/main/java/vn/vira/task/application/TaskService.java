@@ -30,6 +30,8 @@ import vn.vira.task.domain.SavedTaskFilterRepository;
 import vn.vira.task.domain.Task;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.task.domain.TaskStatus;
+import vn.vira.task.domain.TaskStatusHistory;
+import vn.vira.task.domain.TaskStatusHistoryRepository;
 import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
 import vn.vira.sprint.domain.Sprint;
@@ -51,6 +53,7 @@ public class TaskService {
     private final ActivityLogService activityLogs;
     private final TaskNotificationService taskNotifications;
     private final SavedTaskFilterRepository savedFilters;
+    private final TaskStatusHistoryRepository statusHistory;
 
     @Transactional
     public TaskResponse create(Long projectId, CreateTaskRequest request) {
@@ -82,6 +85,7 @@ public class TaskService {
         );
 
         Task saved = taskRepository.save(task);
+        statusHistory.save(new TaskStatusHistory(saved, saved.getStatus()));
         activityLogs.record(saved, "TASK_CREATED", "Tạo công việc");
         return taskMapper.toResponse(saved);
     }
@@ -158,9 +162,10 @@ public class TaskService {
         }
 
         task.changeStatus(request.status());
+        statusHistory.save(new TaskStatusHistory(task, request.status()));
         activityLogs.record(task, "STATUS_CHANGED", "Trạng thái: " + request.status());
         taskNotifications.notifyParticipants(task, "TASK_STATUS_CHANGED", "Task " + task.getTaskCode() + " đã đổi trạng thái", task.getTitle());
-        return taskMapper.toResponse(task);
+        return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
     @Transactional
@@ -169,8 +174,9 @@ public class TaskService {
         Task task = requireTask(projectId, taskId);
         assertVersion(task, request.version());
         reorder(projectId, task, request.status(), request.position());
+        statusHistory.save(new TaskStatusHistory(task, request.status()));
         activityLogs.record(task, "TASK_MOVED", "Di chuyển đến " + request.status());
-        return taskMapper.toResponse(task);
+        return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
     @Transactional
@@ -183,7 +189,7 @@ public class TaskService {
 
         task.assignToSprint(sprint);
         activityLogs.record(task, "SPRINT_CHANGED", sprint == null ? "Đưa về Backlog" : "Sprint: " + sprint.getName());
-        return taskMapper.toResponse(task);
+        return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
     @Transactional
@@ -208,7 +214,7 @@ public class TaskService {
         assertVersion(task, version);
         task.setDeletedAt(null);
         activityLogs.record(task, "TASK_RESTORED", "Khôi phục công việc");
-        return taskMapper.toResponse(task);
+        return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
     private Task findParent(Long projectId, Long parentTaskId) {

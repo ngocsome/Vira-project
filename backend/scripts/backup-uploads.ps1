@@ -11,5 +11,10 @@ if (-not (Test-Path -LiteralPath $source -PathType Container)) {
   exit 0
 }
 $archive = Join-Path $destinationRoot ("vira-uploads-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
-Compress-Archive -LiteralPath (Join-Path $source "*") -DestinationPath $archive -CompressionLevel Optimal
+$items = Get-ChildItem -LiteralPath $source -Force
+if ($items.Count -eq 0) {
+  Write-Output "Không có tệp upload để sao lưu: $source"
+  exit 0
+}
+Compress-Archive -Path (Join-Path $source "*") -DestinationPath $archive -CompressionLevel Optimal
 Write-Output "Đã tạo bản sao lưu upload: $archive"

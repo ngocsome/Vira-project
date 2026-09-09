@@ -17,6 +17,7 @@ import vn.vira.report.api.ReportSeriesPoint;
 import vn.vira.report.api.SeverityCountResponse;
 import vn.vira.report.api.MemberWorkloadResponse;
 import vn.vira.report.api.VelocityPoint;
+import vn.vira.report.api.CumulativeFlowPoint;
 import vn.vira.bug.domain.BugRepository;
 import vn.vira.bug.domain.BugSeverity;
 import vn.vira.sprint.domain.SprintRepository;
@@ -24,6 +25,8 @@ import vn.vira.sprint.domain.SprintStatus;
 import vn.vira.task.domain.TaskRepository;
 import vn.vira.task.domain.TaskStatus;
 import vn.vira.task.domain.TaskType;
+import vn.vira.task.domain.TaskStatusHistory;
+import vn.vira.task.domain.TaskStatusHistoryRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class ReportService {
     private final TaskRepository taskRepository;
     private final SprintRepository sprintRepository;
     private final BugRepository bugRepository;
+    private final TaskStatusHistoryRepository statusHistoryRepository;
 
     @Transactional(readOnly = true)
     public ProjectOverviewResponse overview(Long projectId) {
@@ -76,7 +80,7 @@ public class ReportService {
         return new ProjectReportsResponse(
                 burndown(tasks),
                 velocity(projectId, tasks),
-                cumulativeFlow(tasks),
+                cumulativeFlow(tasks, statusHistoryRepository.findByProjectIdOrderByChangedAtAsc(projectId)),
                 workload(tasks),
                 severity(projectId)
         );
@@ -104,10 +108,22 @@ public class ReportService {
                 }).toList();
     }
 
-    private List<ReportSeriesPoint> cumulativeFlow(List<vn.vira.task.domain.Task> tasks) {
-        Map<String, Long> byStatus = new LinkedHashMap<>();
-        for (TaskStatus status : TaskStatus.values()) byStatus.put(status.name(), tasks.stream().filter(t -> t.getStatus() == status).count());
-        return byStatus.entrySet().stream().map(e -> new ReportSeriesPoint(e.getKey(), e.getValue())).toList();
+    private List<CumulativeFlowPoint> cumulativeFlow(List<vn.vira.task.domain.Task> tasks, List<TaskStatusHistory> histories) {
+        if (tasks.isEmpty()) return List.of();
+        LocalDate start = tasks.stream().map(task -> task.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate()).min(LocalDate::compareTo).orElse(LocalDate.now());
+        Map<Long, List<TaskStatusHistory>> byTask = histories.stream().collect(java.util.stream.Collectors.groupingBy(history -> history.getTask().getId()));
+        List<CumulativeFlowPoint> flow = new ArrayList<>();
+        for (LocalDate date = start; !date.isAfter(LocalDate.now()); date = date.plusDays(1)) {
+            LocalDate point = date;
+            for (TaskStatus status : TaskStatus.values()) {
+                long count = tasks.stream().filter(task -> !task.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate().isAfter(point)).filter(task -> statusAt(task, byTask.getOrDefault(task.getId(), List.of()), point) == status).count();
+                flow.add(new CumulativeFlowPoint(point.toString(), status.name(), count));
+            }
+        }
+        return flow;
+    }
+    private TaskStatus statusAt(vn.vira.task.domain.Task task, List<TaskStatusHistory> events, LocalDate date) {
+        return events.stream().filter(event -> !event.getChangedAt().atZone(ZoneOffset.UTC).toLocalDate().isAfter(date)).max(Comparator.comparing(TaskStatusHistory::getChangedAt)).map(TaskStatusHistory::getStatus).orElse(task.getStatus());
     }
 
     private List<MemberWorkloadResponse> workload(List<vn.vira.task.domain.Task> tasks) {
