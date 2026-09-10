@@ -38,7 +38,11 @@ public class ProjectMemberService {
 
     @Transactional
     public ProjectMemberResponse add(Long projectId, AddProjectMemberRequest request) {
-        Project project = requireManager(projectId);
+        Project project = requireAdmin(projectId);
+        if (request.role() == ProjectRole.OWNER) {
+            throw new BusinessException("Không thể mời thành viên với vai trò chủ sở hữu");
+        }
+
         User user = userRepository.findByEmailIgnoreCase(request.email().trim())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng cần mời"));
 
@@ -56,11 +60,14 @@ public class ProjectMemberService {
             Long userId,
             UpdateProjectMemberRoleRequest request
     ) {
-        requireManager(projectId);
+        requireAdmin(projectId);
         ProjectMember member = findMember(projectId, userId);
 
         if (member.getRole() == ProjectRole.OWNER) {
             throw new BusinessException("Không thể thay đổi vai trò chủ sở hữu dự án");
+        }
+        if (request.role() == ProjectRole.OWNER) {
+            throw new BusinessException("Không thể chuyển vai trò thành chủ sở hữu dự án");
         }
 
         member.changeRole(request.role());
@@ -69,7 +76,7 @@ public class ProjectMemberService {
 
     @Transactional
     public void remove(Long projectId, Long userId) {
-        requireManager(projectId);
+        requireAdmin(projectId);
         ProjectMember member = findMember(projectId, userId);
 
         if (member.getRole() == ProjectRole.OWNER) {
@@ -79,12 +86,12 @@ public class ProjectMemberService {
         member.remove();
     }
 
-    private Project requireManager(Long projectId) {
+    private Project requireAdmin(Long projectId) {
         Project project = projectService.requireMember(projectId);
         ProjectMember currentMember = findMember(projectId, currentUser.id());
 
         if (currentMember.getRole() != ProjectRole.OWNER
-                && currentMember.getRole() != ProjectRole.MANAGER) {
+                && currentMember.getRole() != ProjectRole.ADMIN) {
             throw new org.springframework.security.access.AccessDeniedException(
                     "Bạn không có quyền quản lý thành viên dự án"
             );

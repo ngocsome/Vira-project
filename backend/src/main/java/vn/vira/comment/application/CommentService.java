@@ -18,6 +18,7 @@ import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
 import vn.vira.task.application.TaskNotificationService;
 import vn.vira.audit.application.ActivityLogService;
+import vn.vira.task.application.TaskAuthorizationService;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,7 @@ public class CommentService {
     private final CurrentUser currentUser;
     private final TaskNotificationService taskNotifications;
     private final ActivityLogService activityLogs;
+    private final TaskAuthorizationService taskAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<CommentResponse> findByTask(Long projectId, Long taskId) {
@@ -45,6 +47,7 @@ public class CommentService {
     @Transactional
     public CommentResponse create(Long projectId, Long taskId, CreateCommentRequest request) {
         projectService.requireMember(projectId);
+        taskAuthorizationService.requireTaskCreator(projectId);
         Task task = requireTask(projectId, taskId);
         User author = userRepository.findById(currentUser.id())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
@@ -58,7 +61,7 @@ public class CommentService {
 
     @Transactional
     public CommentResponse togglePinned(Long projectId, Long taskId, Long commentId) {
-        projectService.requireMember(projectId);
+        projectService.requireAdmin(projectId);
         requireTask(projectId, taskId);
 
         Comment comment = commentRepository.findByIdAndTaskIdAndDeletedAtIsNull(commentId, taskId)

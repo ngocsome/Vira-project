@@ -117,8 +117,8 @@ public class TaskCollaborationService {
     private ProjectMember requireParticipantManager(Long projectId) {
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, currentUser.id())
                 .orElseThrow(() -> new AccessDeniedException("Bạn không có quyền quản lý người tham gia công việc"));
-        if (member.getRole() != ProjectRole.OWNER && member.getRole() != ProjectRole.MANAGER && member.getRole() != ProjectRole.LEAD) {
-            throw new AccessDeniedException("Bạn không có quyền gán người thực hiện");
+        if (member.getRole() == ProjectRole.VIEWER) {
+            throw new AccessDeniedException("Người quan sát không có quyền gán người thực hiện");
         }
         return member;
     }
@@ -140,7 +140,7 @@ public class TaskCollaborationService {
 
     private boolean canManage(Long projectId, Long userId) {
         return projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId)
-                .map(member -> member.getRole() == ProjectRole.OWNER || member.getRole() == ProjectRole.MANAGER || member.getRole() == ProjectRole.LEAD)
+                .map(member -> member.getRole() != ProjectRole.VIEWER)
                 .orElse(false);
     }
 

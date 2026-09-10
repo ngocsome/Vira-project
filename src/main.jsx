@@ -65,6 +65,12 @@ const PRIORITY = {
   HIGH: "Cao",
   URGENT: "Khẩn cấp",
 };
+const ROLE_LABELS = {
+  OWNER: "Chủ sở hữu",
+  ADMIN: "Quản trị viên",
+  MEMBER: "Thành viên",
+  VIEWER: "Chỉ xem",
+};
 const Avatar = ({ text, small = false }) => (
   <span className={`avatar ${small ? "small" : ""}`} aria-label={text}>
     <span className="avatar-label">{text}</span>
@@ -142,7 +148,7 @@ function TaskCard({ task, open }) {
   );
 }
 
-function Overview({ overview, tasks, open, create }) {
+function Overview({ overview, tasks, open, create, isViewer }) {
   const attention = tasks.filter((task) => task.status !== "DONE").slice(0, 3);
   return (
     <>
@@ -152,10 +158,12 @@ function Overview({ overview, tasks, open, create }) {
           <h1>Công việc của nhóm</h1>
           <p>Dữ liệu đồng bộ trực tiếp với API Vira.</p>
         </div>
-        <button className="btn primary" onClick={() => create("TODO")}>
-          <Plus size={18} />
-          Tạo công việc
-        </button>
+        {!isViewer && (
+          <button className="btn primary" onClick={() => create("TODO")}>
+            <Plus size={18} />
+            Tạo công việc
+          </button>
+        )}
       </section>
       <section className="metrics">
         <Metric
@@ -270,7 +278,7 @@ function Overview({ overview, tasks, open, create }) {
     </>
   );
 }
-function Board({ tasks, open, create, token, projectId }) {
+function Board({ tasks, open, create, token, projectId, isViewer, isAdmin }) {
   const [columns, setColumns] = useState([]);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -312,18 +320,22 @@ function Board({ tasks, open, create, token, projectId }) {
           <p>Dữ liệu từ dự án hiện tại</p>
         </div>
         <div className="board-actions">
-          <button
-            className="btn secondary"
-            onClick={() => setEditing(!editing)}
-            aria-pressed={editing}
-          >
-            <Settings size={16} />{" "}
-            {editing ? "Đóng cấu hình" : "Cấu hình cột/WIP"}
-          </button>
-          <button className="btn primary" onClick={() => create("TODO")}>
-            <Plus size={17} />
-            Tạo công việc
-          </button>
+          {isAdmin && (
+            <button
+              className="btn secondary"
+              onClick={() => setEditing(!editing)}
+              aria-pressed={editing}
+            >
+              <Settings size={16} />{" "}
+              {editing ? "Đóng cấu hình" : "Cấu hình cột/WIP"}
+            </button>
+          )}
+          {!isViewer && (
+            <button className="btn primary" onClick={() => create("TODO")}>
+              <Plus size={17} />
+              Tạo công việc
+            </button>
+          )}
         </div>
       </div>
       {error && <p className="form-error">{error}</p>}
@@ -370,7 +382,7 @@ function Board({ tasks, open, create, token, projectId }) {
                 {!items.length && (
                   <p className="empty-column">Chưa có công việc</p>
                 )}
-                {status !== "DONE" && (
+                {!isViewer && status !== "DONE" && (
                   <button className="add-card" onClick={() => create(status)}>
                     <Plus size={16} />
                     Thêm công việc
@@ -421,7 +433,7 @@ function WipColumnEditor({ column, save }) {
     </form>
   );
 }
-function Backlog({ tasks, open, create, move, token, projectId }) {
+function Backlog({ tasks, open, create, move, token, projectId, isViewer }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -448,9 +460,14 @@ function Backlog({ tasks, open, create, move, token, projectId }) {
       } catch {
         setVisible(tasks);
       }
-    }, 250);
+    }, 200);
     return () => clearTimeout(timer);
   }, [token, projectId, query, statusFilter, priorityFilter, tasks]);
+  const clear = () => {
+    setQuery("");
+    setStatusFilter("");
+    setPriorityFilter("");
+  };
   const applyFilter = (saved) => {
     try {
       const next = JSON.parse(saved.filters);
@@ -483,10 +500,12 @@ function Backlog({ tasks, open, create, move, token, projectId }) {
           <h1>Backlog dự án</h1>
           <p>Ưu tiên công việc và chuẩn bị cho Sprint tiếp theo.</p>
         </div>
-        <button className="btn primary" onClick={() => create("TODO")}>
-          <Plus size={17} />
-          Tạo công việc
-        </button>
+        {!isViewer && (
+          <button className="btn primary" onClick={() => create("TODO")}>
+            <Plus size={17} />
+            Tạo công việc
+          </button>
+        )}
       </div>
       <div className="card backlog-tools">
         <Search size={18} />
@@ -559,11 +578,11 @@ function Backlog({ tasks, open, create, move, token, projectId }) {
           <button
             className="backlog-row"
             key={task.id}
-            draggable
-            onDragStart={() => setDraggedId(task.id)}
-            onDragOver={(event) => event.preventDefault()}
+            draggable={!isViewer}
+            onDragStart={() => !isViewer && setDraggedId(task.id)}
+            onDragOver={(event) => !isViewer && event.preventDefault()}
             onDrop={() => {
-              if (draggedId && draggedId !== task.id)
+              if (!isViewer && draggedId && draggedId !== task.id)
                 move(draggedId, task.position);
               setDraggedId(null);
             }}
@@ -1662,7 +1681,7 @@ function TaskForm({ close, submit, defaultStatus }) {
   );
 }
 
-function SprintPage({ token, project, tasks, sprints, reload }) {
+function SprintPage({ token, project, tasks, sprints, reload, isAdmin, isViewer }) {
   const [form, setForm] = useState({
     name: "",
     goal: "",
@@ -1690,32 +1709,34 @@ function SprintPage({ token, project, tasks, sprints, reload }) {
         </div>
       </div>
       {error && <p className="form-error">{error}</p>}
-      <form className="card inline-form" onSubmit={create}>
-        <input
-          required
-          placeholder="Tên Sprint"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-        <input
-          placeholder="Mục tiêu"
-          value={form.goal}
-          onChange={(e) => setForm({ ...form, goal: e.target.value })}
-        />
-        <input
-          required
-          type="date"
-          value={form.startDate}
-          onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-        />
-        <input
-          required
-          type="date"
-          value={form.endDate}
-          onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-        />
-        <button className="btn primary">Tạo Sprint</button>
-      </form>
+      {isAdmin && (
+        <form className="card inline-form" onSubmit={create}>
+          <input
+            required
+            placeholder="Tên Sprint"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+          <input
+            placeholder="Mục tiêu"
+            value={form.goal}
+            onChange={(e) => setForm({ ...form, goal: e.target.value })}
+          />
+          <input
+            required
+            type="date"
+            value={form.startDate}
+            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+          />
+          <input
+            required
+            type="date"
+            value={form.endDate}
+            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+          />
+          <button className="btn primary">Tạo Sprint</button>
+        </form>
+      )}
       <div className="entity-list">
         {sprints.map((sprint) => (
           <article className="card entity-row" key={sprint.id}>
@@ -1727,7 +1748,7 @@ function SprintPage({ token, project, tasks, sprints, reload }) {
               </span>
             </div>
             <span className="status-pill">{sprint.status}</span>
-            {sprint.status === "PLANNED" && (
+            {isAdmin && sprint.status === "PLANNED" && (
               <button
                 className="btn secondary"
                 onClick={async () => {
@@ -1738,7 +1759,7 @@ function SprintPage({ token, project, tasks, sprints, reload }) {
                 Bắt đầu
               </button>
             )}
-            {sprint.status === "ACTIVE" && (
+            {isAdmin && sprint.status === "ACTIVE" && (
               <button
                 className="btn secondary"
                 onClick={async () => {
@@ -1759,6 +1780,7 @@ function SprintPage({ token, project, tasks, sprints, reload }) {
           <label key={task.id}>
             {task.taskCode} · {task.title}
             <select
+              disabled={isViewer}
               value={task.sprintId || ""}
               onChange={async (e) => {
                 await viraApi.assignSprint(
@@ -1783,7 +1805,7 @@ function SprintPage({ token, project, tasks, sprints, reload }) {
     </section>
   );
 }
-function MembersPage({ token, project }) {
+function MembersPage({ token, project, currentUser }) {
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("MEMBER");
@@ -1798,42 +1820,49 @@ function MembersPage({ token, project }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const currentMember = members.find((m) => m.userId === currentUser?.id);
+  const canManage = currentMember?.role === "OWNER" || currentMember?.role === "ADMIN" || project?.ownerId === currentUser?.id;
+
   return (
     <section>
       <div className="page-head">
         <div>
           <p className="eyebrow">CỘNG TÁC</p>
           <h1>Thành viên dự án</h1>
-          <p>Mời thành viên và quản lý vai trò truy cập.</p>
+          <p>Mời thành viên và quản lý vai trò truy cập ({members.length} thành viên).</p>
         </div>
       </div>
       {error && <p className="form-error">{error}</p>}
-      <form
-        className="card inline-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            await viraApi.addMember(token, project.id, { email, role });
-            setEmail("");
-            load();
-          } catch (err) {
-            setError(errorText(err));
-          }
-        }}
-      >
-        <input
-          required
-          type="email"
-          placeholder="email@congty.vn"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <select value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="MEMBER">Thành viên</option>
-          <option value="ADMIN">Quản trị viên</option>
-        </select>
-        <button className="btn primary">Mời thành viên</button>
-      </form>
+      {canManage && (
+        <form
+          className="card inline-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              await viraApi.addMember(token, project.id, { email, role });
+              setEmail("");
+              load();
+            } catch (err) {
+              setError(errorText(err));
+            }
+          }}
+        >
+          <input
+            required
+            type="email"
+            placeholder="email@congty.vn"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <select value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="MEMBER">Thành viên</option>
+            <option value="ADMIN">Quản trị viên</option>
+            <option value="VIEWER">Chỉ xem</option>
+          </select>
+          <button className="btn primary">Mời thành viên</button>
+        </form>
+      )}
       <div className="entity-list">
         {members.map((member) => (
           <article className="card entity-row" key={member.userId}>
@@ -1842,23 +1871,31 @@ function MembersPage({ token, project }) {
               <b>{member.fullName}</b>
               <span>{member.email}</span>
             </div>
-            <select
-              value={member.role}
-              onChange={async (e) => {
-                await viraApi.updateMemberRole(
-                  token,
-                  project.id,
-                  member.userId,
-                  e.target.value,
-                );
-                load();
-              }}
-            >
-              <option value="OWNER">Chủ sở hữu</option>
-              <option value="ADMIN">Quản trị viên</option>
-              <option value="MEMBER">Thành viên</option>
-            </select>
-            {member.role !== "OWNER" && (
+            {member.role === "OWNER" ? (
+              <span className="role-badge owner">Chủ sở hữu</span>
+            ) : canManage ? (
+              <select
+                value={member.role}
+                onChange={async (e) => {
+                  await viraApi.updateMemberRole(
+                    token,
+                    project.id,
+                    member.userId,
+                    e.target.value,
+                  );
+                  load();
+                }}
+              >
+                <option value="ADMIN">Quản trị viên</option>
+                <option value="MEMBER">Thành viên</option>
+                <option value="VIEWER">Chỉ xem</option>
+              </select>
+            ) : (
+              <span className={`role-badge ${(member.role || "member").toLowerCase()}`}>
+                {ROLE_LABELS[member.role] || member.role}
+              </span>
+            )}
+            {canManage && member.role !== "OWNER" && (
               <button
                 className="text-btn danger"
                 onClick={async () => {
@@ -2510,6 +2547,7 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [overview, setOverview] = useState(null);
   const [sprints, setSprints] = useState([]);
+  const [members, setMembers] = useState([]);
   const [page, setPage] = useState("Tổng quan");
   const [selected, setSelected] = useState(null);
   const [creating, setCreating] = useState(null);
@@ -2518,14 +2556,16 @@ function App() {
   const [mobile, setMobile] = useState(false);
   const [globalQuery, setGlobalQuery] = useState("");
   const loadProject = useCallback(async (token, value) => {
-    const [loadedTasks, loadedOverview, loadedSprints] = await Promise.all([
+    const [loadedTasks, loadedOverview, loadedSprints, loadedMembers] = await Promise.all([
       viraApi.tasks(token, value.id),
       viraApi.overview(token, value.id),
       viraApi.sprints(token, value.id),
+      viraApi.members(token, value.id).catch(() => []),
     ]);
     setTasks(loadedTasks);
     setOverview(loadedOverview);
     setSprints(loadedSprints);
+    setMembers(loadedMembers);
   }, []);
   const bootstrap = useCallback(async () => {
     if (!session) return;
@@ -2680,6 +2720,11 @@ function App() {
         }}
       />
     );
+  const currentMember = members.find((m) => m.userId === session?.user?.id);
+  const myRole = currentMember?.role || (project?.ownerId === session?.user?.id ? "OWNER" : "MEMBER");
+  const isViewer = myRole === "VIEWER";
+  const isAdmin = myRole === "OWNER" || myRole === "ADMIN";
+
   const content =
     page === "Tổng quan" ? (
       <Overview
@@ -2687,6 +2732,7 @@ function App() {
         tasks={tasks}
         open={setSelected}
         create={setCreating}
+        isViewer={isViewer}
       />
     ) : page === "Bảng công việc" ? (
       <Board
@@ -2695,6 +2741,8 @@ function App() {
         create={setCreating}
         token={session.accessToken}
         projectId={project.id}
+        isViewer={isViewer}
+        isAdmin={isAdmin}
       />
     ) : page === "Backlog" ? (
       <Backlog
@@ -2704,6 +2752,7 @@ function App() {
         move={moveBacklogTask}
         token={session.accessToken}
         projectId={project.id}
+        isViewer={isViewer}
       />
     ) : page === "Sprint" ? (
       <SprintPage
@@ -2712,9 +2761,15 @@ function App() {
         tasks={tasks}
         sprints={sprints}
         reload={() => loadProject(session.accessToken, project)}
+        isAdmin={isAdmin}
+        isViewer={isViewer}
       />
     ) : page === "Thành viên" ? (
-      <MembersPage token={session.accessToken} project={project} />
+      <MembersPage
+        token={session.accessToken}
+        project={project}
+        currentUser={session.user}
+      />
     ) : page === "Lịch sử" ? (
       <AuditPage token={session.accessToken} project={project} />
     ) : page === "Hồ sơ" ? (
@@ -2782,10 +2837,12 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <button onClick={() => setPage("Cài đặt dự án")}>
-            <FolderKanban size={18} />
-            {project.projectKey}
-          </button>
+          {isAdmin && (
+            <button onClick={() => setPage("Cài đặt dự án")}>
+              <FolderKanban size={18} />
+              {project.projectKey}
+            </button>
+          )}
           <button onClick={() => setPage("Hồ sơ")}>
             <Settings size={18} />
             Hồ sơ cá nhân
@@ -2794,7 +2851,9 @@ function App() {
             <Avatar text={initials(session.user.fullName)} />
             <div>
               <b>{session.user.fullName}</b>
-              <span>{session.user.email}</span>
+              <span className={`role-pill ${(myRole || "member").toLowerCase()}`}>
+                {ROLE_LABELS[myRole] || myRole}
+              </span>
             </div>
             <button
               onClick={() => {

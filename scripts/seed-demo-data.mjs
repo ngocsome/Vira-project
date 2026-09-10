@@ -36,10 +36,9 @@ async function main() {
 
   const accounts = [
     { fullName: "Demo Owner", email: "demo@vira.local", password: "Demo@12345", projectRole: "OWNER", wsRole: "OWNER" },
-    { fullName: "Demo Manager", email: "manager@vira.local", password: "Demo@12345", projectRole: "MANAGER", wsRole: "ADMIN" },
-    { fullName: "Demo Lead", email: "lead@vira.local", password: "Demo@12345", projectRole: "LEAD", wsRole: "MEMBER" },
+    { fullName: "Demo Admin", email: "manager@vira.local", password: "Demo@12345", projectRole: "ADMIN", wsRole: "MEMBER" },
     { fullName: "Demo Member", email: "member@vira.local", password: "Demo@12345", projectRole: "MEMBER", wsRole: "MEMBER" },
-    { fullName: "Demo Guest", email: "guest@vira.local", password: "Demo@12345", projectRole: "GUEST", wsRole: "MEMBER" },
+    { fullName: "Demo Viewer", email: "guest@vira.local", password: "Demo@12345", projectRole: "VIEWER", wsRole: "MEMBER" },
   ];
 
   // 1. Đăng ký tài khoản

@@ -26,12 +26,15 @@ class TaskAuthorizationServiceTest {
     @Mock private CurrentUser currentUser;
 
     @Test
-    void guestCannotEditAnotherUsersTask() {
-        Task task = task(10L, 99L, Set.of());
-        ProjectMember guest = mock(ProjectMember.class);
+    void viewerCannotEditTask() {
+        Task task = mock(Task.class);
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(10L);
+        when(task.getProject()).thenReturn(project);
+        ProjectMember viewer = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
-        when(guest.getRole()).thenReturn(ProjectRole.GUEST);
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(guest));
+        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(viewer));
 
         assertThrows(AccessDeniedException.class, () -> service().requireTaskEditor(task));
     }
@@ -39,24 +42,46 @@ class TaskAuthorizationServiceTest {
     @Test
     void assignedMemberCanEditOwnTask() {
         Task task = task(10L, 99L, Set.of(user(7L)));
+        ProjectMember member = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.empty());
+        when(member.getRole()).thenReturn(ProjectRole.MEMBER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(member));
 
         assertDoesNotThrow(() -> service().requireTaskEditor(task));
     }
 
     @Test
-    void leadCanEditProjectTask() {
+    void adminCanEditProjectTask() {
         Task task = mock(Task.class);
         Project project = mock(Project.class);
         when(project.getId()).thenReturn(10L);
         when(task.getProject()).thenReturn(project);
-        ProjectMember lead = mock(ProjectMember.class);
+        ProjectMember admin = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
-        when(lead.getRole()).thenReturn(ProjectRole.LEAD);
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(lead));
+        when(admin.getRole()).thenReturn(ProjectRole.ADMIN);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(admin));
 
         assertDoesNotThrow(() -> service().requireTaskEditor(task));
+    }
+
+    @Test
+    void viewerCannotCreateTask() {
+        ProjectMember viewer = mock(ProjectMember.class);
+        when(currentUser.id()).thenReturn(7L);
+        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(viewer));
+
+        assertThrows(AccessDeniedException.class, () -> service().requireTaskCreator(10L));
+    }
+
+    @Test
+    void memberCanCreateTask() {
+        ProjectMember member = mock(ProjectMember.class);
+        when(currentUser.id()).thenReturn(7L);
+        when(member.getRole()).thenReturn(ProjectRole.MEMBER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(member));
+
+        assertDoesNotThrow(() -> service().requireTaskCreator(10L));
     }
 
     private TaskAuthorizationService service() { return new TaskAuthorizationService(members, currentUser); }

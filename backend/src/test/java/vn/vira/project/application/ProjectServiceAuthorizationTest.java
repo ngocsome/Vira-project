@@ -42,16 +42,29 @@ class ProjectServiceAuthorizationTest {
     }
 
     @Test
-    void guestCannotManageProject() {
+    void viewerCannotManageProject() {
         Project project = mock(Project.class);
-        ProjectMember guest = mock(ProjectMember.class);
+        ProjectMember viewer = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
         when(members.existsByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(true);
         when(projects.findByIdAndArchivedAtIsNull(42L)).thenReturn(Optional.of(project));
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(Optional.of(guest));
-        when(guest.getRole()).thenReturn(ProjectRole.GUEST);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(Optional.of(viewer));
+        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
 
-        assertThrows(AccessDeniedException.class, () -> service().requireManager(42L));
+        assertThrows(AccessDeniedException.class, () -> service().requireAdmin(42L));
+    }
+
+    @Test
+    void adminCanManageProject() {
+        Project project = mock(Project.class);
+        ProjectMember admin = mock(ProjectMember.class);
+        when(currentUser.id()).thenReturn(7L);
+        when(members.existsByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(true);
+        when(projects.findByIdAndArchivedAtIsNull(42L)).thenReturn(Optional.of(project));
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(Optional.of(admin));
+        when(admin.getRole()).thenReturn(ProjectRole.ADMIN);
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service().requireAdmin(42L));
     }
 
     private ProjectService service() { return new ProjectService(projects, members, users, workspaces, currentUser, mapper, boards, activityLogs); }

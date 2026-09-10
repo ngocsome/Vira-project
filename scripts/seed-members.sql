@@ -1,5 +1,5 @@
 INSERT IGNORE INTO workspace_members (workspace_id, user_id, role, joined_at) VALUES 
-(1, 2, 'ADMIN', NOW(6)), 
+(1, 2, 'MEMBER', NOW(6)), 
 (1, 3, 'MEMBER', NOW(6)), 
 (1, 4, 'MEMBER', NOW(6)), 
 (1, 5, 'MEMBER', NOW(6));

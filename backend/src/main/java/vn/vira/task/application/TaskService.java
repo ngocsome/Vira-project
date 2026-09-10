@@ -57,7 +57,8 @@ public class TaskService {
 
     @Transactional
     public TaskResponse create(Long projectId, CreateTaskRequest request) {
-        Project project = projectService.requireManager(projectId);
+        Project project = projectService.requireMember(projectId);
+        taskAuthorizationService.requireTaskCreator(projectId);
         User reporter = userRepository.findById(currentUser.id())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
         Task parentTask = findParent(projectId, request.parentTaskId());
@@ -170,8 +171,9 @@ public class TaskService {
 
     @Transactional
     public TaskResponse move(Long projectId, Long taskId, MoveTaskRequest request) {
-        projectService.requireManager(projectId);
+        projectService.requireMember(projectId);
         Task task = requireTask(projectId, taskId);
+        taskAuthorizationService.requireTaskEditor(task);
         assertVersion(task, request.version());
         reorder(projectId, task, request.status(), request.position());
         statusHistory.save(new TaskStatusHistory(task, request.status()));
@@ -194,7 +196,7 @@ public class TaskService {
 
     @Transactional
     public void softDelete(Long projectId, Long taskId, Long version) {
-        projectService.requireManager(projectId);
+        projectService.requireAdmin(projectId);
         Task task = taskRepository.findByIdAndProjectIdAndDeletedAtIsNull(taskId, projectId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy công việc"));
 
@@ -208,7 +210,7 @@ public class TaskService {
 
     @Transactional
     public TaskResponse restore(Long projectId, Long taskId, Long version) {
-        projectService.requireManager(projectId);
+        projectService.requireAdmin(projectId);
         Task task = taskRepository.findByIdAndProjectIdAndDeletedAtIsNotNull(taskId, projectId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy công việc đã xóa"));
         assertVersion(task, version);

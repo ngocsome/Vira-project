@@ -73,21 +73,20 @@ Sao lưu MySQL: `cd backend; .\scripts\backup-mysql.ps1`. Khôi phục: `cd back
 | Tài khoản | Email | Mật khẩu | Vai trò project demo |
 | --- | --- | --- | --- |
 | Demo Owner | `demo@vira.local` | `Demo@12345` | `OWNER` |
-| Demo Manager | `manager@vira.local` | `Demo@12345` | `MANAGER` |
-| Demo Lead | `lead@vira.local` | `Demo@12345` | `LEAD` |
+| Demo Admin | `manager@vira.local` | `Demo@12345` | `ADMIN` |
 | Demo Member | `member@vira.local` | `Demo@12345` | `MEMBER` |
-| Demo Guest | `guest@vira.local` | `Demo@12345` | `GUEST` |
+| Demo Viewer | `guest@vira.local` | `Demo@12345` | `VIEWER` |
 
-Tất cả tài khoản trên đã là thành viên của workspace/project demo và có thể dùng ngay trên task `DEMO-101`. Workspace role tương ứng là Owner cho tài khoản đầu tiên, Admin cho Demo Manager và Member cho các tài khoản còn lại.
+Tất cả tài khoản trên đã là thành viên của workspace/project demo và có thể dùng ngay trên task `DEMO-101`. Workspace role tương ứng là Owner cho tài khoản đầu tiên, Member cho các tài khoản còn lại.
 
 ### Vai trò
 
 | Cấp | Vai trò | Ý nghĩa |
 | --- | --- | --- |
-| Workspace | `OWNER`, `ADMIN`, `MEMBER` | Chủ sở hữu, quản trị, thành viên workspace |
-| Project | `OWNER`, `MANAGER`, `LEAD`, `MEMBER`, `GUEST` | Kiểm soát phạm vi thao tác trong project |
+| Workspace | `OWNER`, `MEMBER` | Chủ sở hữu, thành viên workspace |
+| Project | `OWNER`, `ADMIN`, `MEMBER`, `VIEWER` | Kiểm soát phạm vi thao tác trong project (Chủ dự án, Quản trị viên, Thành viên thực thi, Người quan sát chỉ xem) |
 
-`OWNER`, `MANAGER`, `LEAD` có thể gán người thực hiện cho task. `MEMBER` có thể tự tham gia/rời hoặc theo dõi task. Mọi participant đều được kiểm tra là thành viên còn hiệu lực của chính project đó.
+`OWNER`, `ADMIN`, `MEMBER` có thể tạo công việc và gán người thực hiện cho task. `VIEWER` ở chế độ chỉ xem (read-only), không thể chỉnh sửa hay đổi trạng thái công việc. Mọi participant đều được kiểm tra là thành viên còn hiệu lực của chính project đó.
 
 ## Luồng cộng tác task
 

@@ -2,8 +2,7 @@ package vn.vira.project.domain;
 
 public enum ProjectRole {
     OWNER,
-    MANAGER,
-    LEAD,
+    ADMIN,
     MEMBER,
-    GUEST
+    VIEWER
 }

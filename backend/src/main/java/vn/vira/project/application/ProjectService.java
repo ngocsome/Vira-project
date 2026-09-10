@@ -134,14 +134,19 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public Project requireManager(Long projectId) {
+    public Project requireAdmin(Long projectId) {
         Project project = requireMember(projectId);
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, currentUser.id())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy thành viên dự án"));
-        if (member.getRole() != ProjectRole.OWNER && member.getRole() != ProjectRole.MANAGER && member.getRole() != ProjectRole.LEAD) {
-            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền cấu hình dự án");
+        if (member.getRole() != ProjectRole.OWNER && member.getRole() != ProjectRole.ADMIN) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền quản trị dự án");
         }
         return project;
+    }
+
+    @Transactional(readOnly = true)
+    public Project requireManager(Long projectId) {
+        return requireAdmin(projectId);
     }
 
     private Project requireOwner(Long projectId) {

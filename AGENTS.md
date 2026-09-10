@@ -82,10 +82,9 @@ Tất cả tài khoản demo sử dụng chung mật khẩu: `Demo@12345`.
 | Tài khoản | Email | Vai trò Workspace | Vai trò Project DEMO | Quyền hạn chính |
 | :--- | :--- | :--- | :--- | :--- |
 | **Demo Owner** | `demo@vira.local` | `OWNER` | `OWNER` | Toàn quyền workspace và project |
-| **Demo Manager** | `manager@vira.local` | `ADMIN` | `MANAGER` | Quản lý dự án, cấu hình WIP, mời thành viên |
-| **Demo Lead** | `lead@vira.local` | `MEMBER` | `LEAD` | Phân công task, quản lý sprint |
-| **Demo Member** | `member@vira.local` | `MEMBER` | `MEMBER` | Nhận task, cập nhật trạng thái, bình luận |
-| **Demo Guest** | `guest@vira.local` | `MEMBER` | `GUEST` | Chỉ xem (read-only) |
+| **Demo Admin** | `manager@vira.local` | `MEMBER` | `ADMIN` | Quản trị dự án, quản lý sprint/board, mời/đổi vai trò thành viên |
+| **Demo Member** | `member@vira.local` | `MEMBER` | `MEMBER` | Tạo task, nhận/gán task, kéo thả Kanban, cập nhật trạng thái, bình luận |
+| **Demo Viewer** | `guest@vira.local` | `MEMBER` | `VIEWER` | Chỉ xem (read-only hoàn toàn), không được sửa đổi dữ liệu |
 
 ---
 
