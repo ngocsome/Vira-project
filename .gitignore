@@ -1,6 +1,57 @@
+# Dependencies
 node_modules/
-playwright-report/
-test-results/
+/.pnp
+.pnp.js
+
+# AI Agents & Assistants
+.agents/
+.codegraph/
+.gemini/
+
+# Production & Build outputs
+dist/
+dist-ssr/
+build/
 backend/target/
+
+# Local backups & user uploads
 backend/backups/
 backend/uploads/
+
+# Test reports & Coverage
+playwright-report/
+test-results/
+coverage/
+*.exec
+jacoco.exec
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+vite.log
+
+# Environment variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!backend/.env.example
+
+# Editor & IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
