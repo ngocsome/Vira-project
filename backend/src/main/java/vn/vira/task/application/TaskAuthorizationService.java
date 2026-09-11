@@ -20,10 +20,6 @@ public class TaskAuthorizationService {
     public void requireTaskEditor(Task task) {
         Long userId = currentUser.id();
         Long projectId = task.getProject().getId();
-        var memberOpt = projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId);
-        if (memberOpt.isPresent() && memberOpt.get().getRole() == ProjectRole.VIEWER) {
-            throw new AccessDeniedException("Người quan sát chỉ có quyền xem, không thể chỉnh sửa công việc");
-        }
 
         if (isAdmin(projectId, userId)
                 || task.getReporter().getId().equals(userId)
@@ -36,11 +32,8 @@ public class TaskAuthorizationService {
     @Transactional(readOnly = true)
     public void requireTaskCreator(Long projectId) {
         Long userId = currentUser.id();
-        var member = projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId)
+        projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId)
                 .orElseThrow(() -> new AccessDeniedException("Bạn không phải là thành viên của dự án"));
-        if (member.getRole() == ProjectRole.VIEWER) {
-            throw new AccessDeniedException("Người quan sát chỉ có quyền xem, không thể tạo công việc");
-        }
     }
 
     @Transactional(readOnly = true)

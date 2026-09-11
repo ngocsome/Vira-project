@@ -1043,11 +1043,6 @@ main {
   color: #15803d;
   border: 1px solid #bbf7d0;
 }
-.role-badge.viewer {
-  background: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
-}
 
 .role-pill {
   display: inline-block;
@@ -1062,7 +1057,6 @@ main {
 .role-pill.owner { background: #fef3c7; color: #b45309; }
 .role-pill.admin { background: #e0e7ff; color: #4338ca; }
 .role-pill.member { background: #dcfce7; color: #15803d; }
-.role-pill.viewer { background: #f1f5f9; color: #64748b; }
 .active {
   display: flex !important;
   align-items: center;

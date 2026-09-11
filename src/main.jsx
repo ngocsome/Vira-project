@@ -69,7 +69,6 @@ const ROLE_LABELS = {
   OWNER: "Chủ sở hữu",
   ADMIN: "Quản trị viên",
   MEMBER: "Thành viên",
-  VIEWER: "Chỉ xem",
 };
 const Avatar = ({ text, small = false }) => (
   <span className={`avatar ${small ? "small" : ""}`} aria-label={text}>
@@ -148,7 +147,7 @@ function TaskCard({ task, open }) {
   );
 }
 
-function Overview({ overview, tasks, open, create, isViewer }) {
+function Overview({ overview, tasks, open, create }) {
   const attention = tasks.filter((task) => task.status !== "DONE").slice(0, 3);
   return (
     <>
@@ -158,12 +157,10 @@ function Overview({ overview, tasks, open, create, isViewer }) {
           <h1>Công việc của nhóm</h1>
           <p>Dữ liệu đồng bộ trực tiếp với API Vira.</p>
         </div>
-        {!isViewer && (
-          <button className="btn primary" onClick={() => create("TODO")}>
-            <Plus size={18} />
-            Tạo công việc
-          </button>
-        )}
+        <button className="btn primary" onClick={() => create("TODO")}>
+          <Plus size={18} />
+          Tạo công việc
+        </button>
       </section>
       <section className="metrics">
         <Metric
@@ -278,7 +275,7 @@ function Overview({ overview, tasks, open, create, isViewer }) {
     </>
   );
 }
-function Board({ tasks, open, create, token, projectId, isViewer, isAdmin }) {
+function Board({ tasks, open, create, token, projectId, isAdmin }) {
   const [columns, setColumns] = useState([]);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -330,12 +327,10 @@ function Board({ tasks, open, create, token, projectId, isViewer, isAdmin }) {
               {editing ? "Đóng cấu hình" : "Cấu hình cột/WIP"}
             </button>
           )}
-          {!isViewer && (
-            <button className="btn primary" onClick={() => create("TODO")}>
-              <Plus size={17} />
-              Tạo công việc
-            </button>
-          )}
+          <button className="btn primary" onClick={() => create("TODO")}>
+            <Plus size={17} />
+            Tạo công việc
+          </button>
         </div>
       </div>
       {error && <p className="form-error">{error}</p>}
@@ -382,7 +377,7 @@ function Board({ tasks, open, create, token, projectId, isViewer, isAdmin }) {
                 {!items.length && (
                   <p className="empty-column">Chưa có công việc</p>
                 )}
-                {!isViewer && status !== "DONE" && (
+                {status !== "DONE" && (
                   <button className="add-card" onClick={() => create(status)}>
                     <Plus size={16} />
                     Thêm công việc
@@ -433,7 +428,7 @@ function WipColumnEditor({ column, save }) {
     </form>
   );
 }
-function Backlog({ tasks, open, create, move, token, projectId, isViewer }) {
+function Backlog({ tasks, open, create, move, token, projectId }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -500,12 +495,10 @@ function Backlog({ tasks, open, create, move, token, projectId, isViewer }) {
           <h1>Backlog dự án</h1>
           <p>Ưu tiên công việc và chuẩn bị cho Sprint tiếp theo.</p>
         </div>
-        {!isViewer && (
-          <button className="btn primary" onClick={() => create("TODO")}>
-            <Plus size={17} />
-            Tạo công việc
-          </button>
-        )}
+        <button className="btn primary" onClick={() => create("TODO")}>
+          <Plus size={17} />
+          Tạo công việc
+        </button>
       </div>
       <div className="card backlog-tools">
         <Search size={18} />
@@ -578,11 +571,11 @@ function Backlog({ tasks, open, create, move, token, projectId, isViewer }) {
           <button
             className="backlog-row"
             key={task.id}
-            draggable={!isViewer}
-            onDragStart={() => !isViewer && setDraggedId(task.id)}
-            onDragOver={(event) => !isViewer && event.preventDefault()}
+            draggable
+            onDragStart={() => setDraggedId(task.id)}
+            onDragOver={(event) => event.preventDefault()}
             onDrop={() => {
-              if (!isViewer && draggedId && draggedId !== task.id)
+              if (draggedId && draggedId !== task.id)
                 move(draggedId, task.position);
               setDraggedId(null);
             }}
@@ -1681,7 +1674,7 @@ function TaskForm({ close, submit, defaultStatus }) {
   );
 }
 
-function SprintPage({ token, project, tasks, sprints, reload, isAdmin, isViewer }) {
+function SprintPage({ token, project, tasks, sprints, reload, isAdmin }) {
   const [form, setForm] = useState({
     name: "",
     goal: "",
@@ -1780,7 +1773,6 @@ function SprintPage({ token, project, tasks, sprints, reload, isAdmin, isViewer 
           <label key={task.id}>
             {task.taskCode} · {task.title}
             <select
-              disabled={isViewer}
               value={task.sprintId || ""}
               onChange={async (e) => {
                 await viraApi.assignSprint(
@@ -1858,7 +1850,6 @@ function MembersPage({ token, project, currentUser }) {
           <select value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="MEMBER">Thành viên</option>
             <option value="ADMIN">Quản trị viên</option>
-            <option value="VIEWER">Chỉ xem</option>
           </select>
           <button className="btn primary">Mời thành viên</button>
         </form>
@@ -1888,7 +1879,6 @@ function MembersPage({ token, project, currentUser }) {
               >
                 <option value="ADMIN">Quản trị viên</option>
                 <option value="MEMBER">Thành viên</option>
-                <option value="VIEWER">Chỉ xem</option>
               </select>
             ) : (
               <span className={`role-badge ${(member.role || "member").toLowerCase()}`}>
@@ -2722,7 +2712,6 @@ function App() {
     );
   const currentMember = members.find((m) => m.userId === session?.user?.id);
   const myRole = currentMember?.role || (project?.ownerId === session?.user?.id ? "OWNER" : "MEMBER");
-  const isViewer = myRole === "VIEWER";
   const isAdmin = myRole === "OWNER" || myRole === "ADMIN";
 
   const content =
@@ -2732,7 +2721,6 @@ function App() {
         tasks={tasks}
         open={setSelected}
         create={setCreating}
-        isViewer={isViewer}
       />
     ) : page === "Bảng công việc" ? (
       <Board
@@ -2741,7 +2729,6 @@ function App() {
         create={setCreating}
         token={session.accessToken}
         projectId={project.id}
-        isViewer={isViewer}
         isAdmin={isAdmin}
       />
     ) : page === "Backlog" ? (
@@ -2752,7 +2739,6 @@ function App() {
         move={moveBacklogTask}
         token={session.accessToken}
         projectId={project.id}
-        isViewer={isViewer}
       />
     ) : page === "Sprint" ? (
       <SprintPage
@@ -2762,7 +2748,6 @@ function App() {
         sprints={sprints}
         reload={() => loadProject(session.accessToken, project)}
         isAdmin={isAdmin}
-        isViewer={isViewer}
       />
     ) : page === "Thành viên" ? (
       <MembersPage

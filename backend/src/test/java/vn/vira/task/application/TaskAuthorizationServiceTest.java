@@ -26,15 +26,12 @@ class TaskAuthorizationServiceTest {
     @Mock private CurrentUser currentUser;
 
     @Test
-    void viewerCannotEditTask() {
-        Task task = mock(Task.class);
-        Project project = mock(Project.class);
-        when(project.getId()).thenReturn(10L);
-        when(task.getProject()).thenReturn(project);
-        ProjectMember viewer = mock(ProjectMember.class);
+    void unassignedMemberCannotEditTask() {
+        Task task = task(10L, 99L, Set.of(user(88L)));
+        ProjectMember member = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
-        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(viewer));
+        when(member.getRole()).thenReturn(ProjectRole.MEMBER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(member));
 
         assertThrows(AccessDeniedException.class, () -> service().requireTaskEditor(task));
     }
@@ -65,11 +62,9 @@ class TaskAuthorizationServiceTest {
     }
 
     @Test
-    void viewerCannotCreateTask() {
-        ProjectMember viewer = mock(ProjectMember.class);
+    void nonMemberCannotCreateTask() {
         when(currentUser.id()).thenReturn(7L);
-        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(viewer));
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> service().requireTaskCreator(10L));
     }
@@ -78,7 +73,6 @@ class TaskAuthorizationServiceTest {
     void memberCanCreateTask() {
         ProjectMember member = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
-        when(member.getRole()).thenReturn(ProjectRole.MEMBER);
         when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(10L, 7L)).thenReturn(Optional.of(member));
 
         assertDoesNotThrow(() -> service().requireTaskCreator(10L));

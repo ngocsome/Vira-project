@@ -38,7 +38,7 @@ async function main() {
     { fullName: "Demo Owner", email: "demo@vira.local", password: "Demo@12345", projectRole: "OWNER", wsRole: "OWNER" },
     { fullName: "Demo Admin", email: "manager@vira.local", password: "Demo@12345", projectRole: "ADMIN", wsRole: "MEMBER" },
     { fullName: "Demo Member", email: "member@vira.local", password: "Demo@12345", projectRole: "MEMBER", wsRole: "MEMBER" },
-    { fullName: "Demo Viewer", email: "guest@vira.local", password: "Demo@12345", projectRole: "VIEWER", wsRole: "MEMBER" },
+    { fullName: "Demo Contributor", email: "guest@vira.local", password: "Demo@12345", projectRole: "MEMBER", wsRole: "MEMBER" },
   ];
 
   // 1. Đăng ký tài khoản

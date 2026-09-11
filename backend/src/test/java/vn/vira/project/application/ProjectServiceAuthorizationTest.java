@@ -42,14 +42,14 @@ class ProjectServiceAuthorizationTest {
     }
 
     @Test
-    void viewerCannotManageProject() {
+    void memberCannotManageProject() {
         Project project = mock(Project.class);
-        ProjectMember viewer = mock(ProjectMember.class);
+        ProjectMember member = mock(ProjectMember.class);
         when(currentUser.id()).thenReturn(7L);
         when(members.existsByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(true);
         when(projects.findByIdAndArchivedAtIsNull(42L)).thenReturn(Optional.of(project));
-        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(Optional.of(viewer));
-        when(viewer.getRole()).thenReturn(ProjectRole.VIEWER);
+        when(members.findByProjectIdAndUserIdAndRemovedAtIsNull(42L, 7L)).thenReturn(Optional.of(member));
+        when(member.getRole()).thenReturn(ProjectRole.MEMBER);
 
         assertThrows(AccessDeniedException.class, () -> service().requireAdmin(42L));
     }

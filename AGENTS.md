@@ -84,7 +84,7 @@ Tất cả tài khoản demo sử dụng chung mật khẩu: `Demo@12345`.
 | **Demo Owner** | `demo@vira.local` | `OWNER` | `OWNER` | Toàn quyền workspace và project |
 | **Demo Admin** | `manager@vira.local` | `MEMBER` | `ADMIN` | Quản trị dự án, quản lý sprint/board, mời/đổi vai trò thành viên |
 | **Demo Member** | `member@vira.local` | `MEMBER` | `MEMBER` | Tạo task, nhận/gán task, kéo thả Kanban, cập nhật trạng thái, bình luận |
-| **Demo Viewer** | `guest@vira.local` | `MEMBER` | `VIEWER` | Chỉ xem (read-only hoàn toàn), không được sửa đổi dữ liệu |
+| **Demo Contributor** | `guest@vira.local` | `MEMBER` | `MEMBER` | Thành viên đóng góp dự án, cộng tác trên task |
 
 ---
 

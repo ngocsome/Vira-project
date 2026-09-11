@@ -12,7 +12,6 @@ import vn.vira.notification.application.NotificationService;
 import vn.vira.project.application.ProjectService;
 import vn.vira.project.domain.ProjectMember;
 import vn.vira.project.domain.ProjectMemberRepository;
-import vn.vira.project.domain.ProjectRole;
 import vn.vira.shared.exception.BusinessException;
 import vn.vira.shared.exception.NotFoundException;
 import vn.vira.shared.security.CurrentUser;
@@ -115,12 +114,8 @@ public class TaskCollaborationService {
     }
 
     private ProjectMember requireParticipantManager(Long projectId) {
-        ProjectMember member = projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, currentUser.id())
+        return projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, currentUser.id())
                 .orElseThrow(() -> new AccessDeniedException("Bạn không có quyền quản lý người tham gia công việc"));
-        if (member.getRole() == ProjectRole.VIEWER) {
-            throw new AccessDeniedException("Người quan sát không có quyền gán người thực hiện");
-        }
-        return member;
     }
 
     private User currentUserEntity() {
@@ -139,9 +134,7 @@ public class TaskCollaborationService {
     }
 
     private boolean canManage(Long projectId, Long userId) {
-        return projectMemberRepository.findByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId)
-                .map(member -> member.getRole() != ProjectRole.VIEWER)
-                .orElse(false);
+        return projectMemberRepository.existsByProjectIdAndUserIdAndRemovedAtIsNull(projectId, userId);
     }
 
     private TaskParticipantResponse participant(User user) {
