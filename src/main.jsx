@@ -2352,10 +2352,17 @@ function ProfilePage({ token, session, onSession }) {
   );
 }
 
-function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
+function WorkspaceHome({ token, workspace, selectProject, switchWorkspace, archiveWorkspace }) {
   const [projects, setProjects] = useState([]);
   const [archived, setArchived] = useState([]);
   const [error, setError] = useState("");
+  const [newProject, setNewProject] = useState({
+    name: "",
+    projectKey: "",
+    projectType: "KANBAN",
+  });
+  const [creating, setCreating] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const [active, archivedItems] = await Promise.all([
@@ -2368,9 +2375,11 @@ function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
       setError(errorText(err));
     }
   }, [token, workspace.id]);
+
   useEffect(() => {
     load();
   }, [load]);
+
   const restore = async (item) => {
     try {
       selectProject(await viraApi.restoreProject(token, item.id));
@@ -2378,6 +2387,26 @@ function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
       setError(errorText(err));
     }
   };
+
+  const handleCreateProject = async (event) => {
+    event.preventDefault();
+    setError("");
+    setCreating(true);
+    try {
+      const created = await viraApi.createProject(token, workspace.id, {
+        name: newProject.name.trim(),
+        projectKey: newProject.projectKey.trim().toUpperCase(),
+        description: "",
+        projectType: newProject.projectType || "KANBAN",
+      });
+      selectProject(created);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <main className="auth-page workspace-home">
       <section className="auth-card wide-card">
@@ -2423,9 +2452,53 @@ function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
             </div>
           </>
         )}
-        <button className="text-danger-btn" onClick={archiveWorkspace}>
-          Lưu trữ workspace này
-        </button>
+        <form className="create-workspace-form" onSubmit={handleCreateProject}>
+          <label>
+            Tạo dự án mới
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "8px", marginTop: "6px" }}>
+              <input
+                required
+                placeholder="Tên dự án (ví dụ: Phát triển Web)"
+                value={newProject.name}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const autoKey = val.split(/\s+/).map(w => w[0]).join("").slice(0, 5).toUpperCase();
+                  setNewProject(prev => ({
+                    ...prev,
+                    name: val,
+                    projectKey: prev.projectKey ? prev.projectKey : autoKey,
+                  }));
+                }}
+              />
+              <input
+                required
+                placeholder="Mã (KEY)"
+                maxLength={10}
+                style={{ textTransform: "uppercase" }}
+                value={newProject.projectKey}
+                onChange={(e) => setNewProject({ ...newProject, projectKey: e.target.value.toUpperCase() })}
+              />
+              <select
+                value={newProject.projectType}
+                onChange={(e) => setNewProject({ ...newProject, projectType: e.target.value })}
+              >
+                <option value="KANBAN">Kanban</option>
+                <option value="SCRUM">Scrum</option>
+              </select>
+            </div>
+          </label>
+          <button className="btn primary" disabled={creating} style={{ marginTop: "10px" }}>
+            {creating ? "Đang tạo..." : "Tạo dự án"}
+          </button>
+        </form>
+        <div style={{ marginTop: "18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button type="button" className="text-btn" onClick={switchWorkspace}>
+            ← Đổi không gian làm việc khác
+          </button>
+          <button type="button" className="text-danger-btn" onClick={archiveWorkspace}>
+            Lưu trữ workspace này
+          </button>
+        </div>
       </section>
     </main>
   );
@@ -2732,6 +2805,10 @@ function App() {
         selectProject={async (item) => {
           setProject(item);
           await loadProject(session.accessToken, item);
+        }}
+        switchWorkspace={() => {
+          setProject(null);
+          setWorkspace(null);
         }}
         archiveWorkspace={async () => {
           if (!window.confirm(`Lưu trữ workspace “${workspace.name}”?`)) return;
