@@ -20,8 +20,18 @@ export async function request(path, { method = "GET", token, body } = {}) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || !payload?.success) {
+    if (response.status === 401) {
+      localStorage.removeItem("vira.session");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("vira:unauthorized"));
+      }
+    }
+    const defaultMessage =
+      response.status === 401
+        ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+        : "Không thể kết nối tới máy chủ.";
     throw new ApiError(
-      payload?.message ?? "Không thể kết nối tới máy chủ.",
+      payload?.message ?? defaultMessage,
       response.status,
     );
   }

@@ -90,7 +90,7 @@ const dateText = (value) =>
       }).format(new Date(`${value}T00:00:00`))
     : "Chưa đặt hạn";
 const errorText = (error) =>
-  error instanceof ApiError && error.status === 401
+  error?.status === 401
     ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
     : error?.message || "Đã có lỗi xảy ra.";
 
@@ -2431,7 +2431,7 @@ function WorkspaceHome({ token, workspace, selectProject, archiveWorkspace }) {
   );
 }
 
-function WorkspaceLanding({ token, chooseWorkspace }) {
+function WorkspaceLanding({ token, chooseWorkspace, onLogout }) {
   const [active, setActive] = useState([]);
   const [archived, setArchived] = useState([]);
   const [name, setName] = useState("");
@@ -2446,8 +2446,11 @@ function WorkspaceLanding({ token, chooseWorkspace }) {
       setArchived(old);
     } catch (err) {
       setError(errorText(err));
+      if (err?.status === 401 && onLogout) {
+        onLogout();
+      }
     }
-  }, [token]);
+  }, [token, onLogout]);
   useEffect(() => {
     load();
   }, [load]);
@@ -2523,6 +2526,22 @@ function WorkspaceLanding({ token, chooseWorkspace }) {
           </label>
           <button className="btn primary">Tạo</button>
         </form>
+        <div style={{ marginTop: "16px", textAlign: "center", display: "flex", justifyContent: "center", gap: "10px" }}>
+          {error && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={load}
+            >
+              Thử lại
+            </button>
+          )}
+          {onLogout && (
+            <button type="button" className="text-btn" onClick={onLogout}>
+              Đăng xuất / Đăng nhập tài khoản khác
+            </button>
+          )}
+        </div>
       </section>
     </main>
   );
@@ -2591,6 +2610,16 @@ function App() {
   useEffect(() => {
     bootstrap();
   }, [bootstrap]);
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      localStorage.removeItem("vira.session");
+      setSession(null);
+      setWorkspace(null);
+      setProject(null);
+    };
+    window.addEventListener("vira:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("vira:unauthorized", handleUnauthorized);
+  }, []);
   const authenticated = (next) => {
     localStorage.setItem("vira.session", JSON.stringify(next));
     setSession(next);
@@ -2687,6 +2716,12 @@ function App() {
       <WorkspaceLanding
         token={session.accessToken}
         chooseWorkspace={chooseWorkspace}
+        onLogout={() => {
+          localStorage.removeItem("vira.session");
+          setSession(null);
+          setWorkspace(null);
+          setProject(null);
+        }}
       />
     );
   if (!project)
