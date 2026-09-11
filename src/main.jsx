@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   AlertCircle,
@@ -116,10 +116,51 @@ function Empty({ message }) {
     </div>
   );
 }
-function TaskCard({ task, open }) {
+function TaskCard({
+  task,
+  open,
+  draggable = false,
+  isDragging = false,
+  isDragOver = false,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}) {
   const [status] = STATUS[task.status] || STATUS.TODO;
+  const draggingRef = useRef(false);
+
   return (
-    <button className="task-card" onClick={() => open(task)}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`task-card ${isDragging ? "dragging" : ""} ${isDragOver ? "drag-over-card" : ""}`}
+      draggable={draggable}
+      onDragStart={(e) => {
+        draggingRef.current = true;
+        onDragStart?.(e);
+      }}
+      onDragEnd={(e) => {
+        setTimeout(() => {
+          draggingRef.current = false;
+        }, 50);
+        onDragEnd?.(e);
+      }}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={() => {
+        if (draggingRef.current) return;
+        open(task);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open(task);
+        }
+      }}
+    >
       <div className="task-top">
         <span className={`type ${task.taskType === "BUG" ? "bug" : ""}`}>
           {TYPE[task.taskType]}
@@ -143,7 +184,7 @@ function TaskCard({ task, open }) {
         </span>
         <span className="task-status-inline">{status}</span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -275,16 +316,21 @@ function Overview({ overview, tasks, open, create }) {
     </>
   );
 }
-function Board({ tasks, open, create, token, projectId, isAdmin }) {
+function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
   const [columns, setColumns] = useState([]);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
+
   useEffect(() => {
     viraApi
       .board(token, projectId)
       .then((board) => setColumns(board.columns))
       .catch((err) => setError(errorText(err)));
   }, [token, projectId]);
+
   const saveColumn = async (column, values) => {
     try {
       const next = await viraApi.updateBoardColumn(
@@ -300,6 +346,47 @@ function Board({ tasks, open, create, token, projectId, isAdmin }) {
       setError(errorText(err));
     }
   };
+
+  const handleDragStart = (e, task) => {
+    e.dataTransfer.setData("text/plain", String(task.id));
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedTaskId(task.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverColumnId(null);
+    setDragOverTaskId(null);
+  };
+
+  const handleCardDrop = (e, targetTask, column) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceId = draggedTaskId || e.dataTransfer.getData("text/plain");
+    handleDragEnd();
+
+    if (!sourceId || String(sourceId) === String(targetTask.id)) return;
+
+    const columnTasks = tasks.filter((t) => t.status === column.taskStatus);
+    const targetIndex = columnTasks.findIndex((t) => String(t.id) === String(targetTask.id));
+    if (targetIndex >= 0 && move) {
+      move(sourceId, column.taskStatus, targetIndex);
+    }
+  };
+
+  const handleColumnDrop = (e, column) => {
+    e.preventDefault();
+    const sourceId = draggedTaskId || e.dataTransfer.getData("text/plain");
+    handleDragEnd();
+
+    if (!sourceId) return;
+
+    const columnTasks = tasks.filter((t) => t.status === column.taskStatus);
+    if (move) {
+      move(sourceId, column.taskStatus, columnTasks.length);
+    }
+  };
+
   const displayColumns = columns.length
     ? columns
     : ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].map((taskStatus, index) => ({
@@ -309,6 +396,7 @@ function Board({ tasks, open, create, token, projectId, isAdmin }) {
         position: index + 1,
         wipLimit: null,
       }));
+
   return (
     <section className="board-wrap">
       <div className="board-toolbar">
@@ -355,8 +443,21 @@ function Board({ tasks, open, create, token, projectId, isAdmin }) {
           const overWip = column.wipLimit && items.length > column.wipLimit;
           return (
             <div
-              className={`kanban-col ${overWip ? "over-wip" : ""}`}
+              className={`kanban-col ${overWip ? "over-wip" : ""} ${dragOverColumnId === column.id ? "drag-over" : ""}`}
               key={column.id}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dragOverColumnId !== column.id) {
+                  setDragOverColumnId(column.id);
+                }
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setDragOverColumnId(null);
+                }
+              }}
+              onDrop={(e) => handleColumnDrop(e, column)}
             >
               <div className="column-head">
                 <span>
@@ -372,7 +473,30 @@ function Board({ tasks, open, create, token, projectId, isAdmin }) {
               </div>
               <div className="task-list">
                 {items.map((task) => (
-                  <TaskCard task={task} key={task.id} open={open} />
+                  <TaskCard
+                    task={task}
+                    key={task.id}
+                    open={open}
+                    draggable={true}
+                    isDragging={draggedTaskId === task.id}
+                    isDragOver={dragOverTaskId === task.id}
+                    onDragStart={(e) => handleDragStart(e, task)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverTaskId !== task.id) {
+                        setDragOverTaskId(task.id);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverTaskId === task.id) {
+                        setDragOverTaskId(null);
+                      }
+                    }}
+                    onDrop={(e) => handleCardDrop(e, task, column)}
+                  />
                 ))}
                 {!items.length && (
                   <p className="empty-column">Chưa có công việc</p>
@@ -3253,22 +3377,46 @@ function App() {
       setError(errorText(err));
     }
   };
-  const moveBacklogTask = async (taskId, position) => {
-    const task = tasks.find((item) => item.id === taskId);
+  const moveTask = async (taskId, targetStatusOrPosition, maybePosition) => {
+    const task = tasks.find((item) => String(item.id) === String(taskId));
     if (!task) return;
+
+    let targetStatus = task.status;
+    let position = 0;
+
+    if (typeof targetStatusOrPosition === "string") {
+      targetStatus = targetStatusOrPosition;
+      position = typeof maybePosition === "number" ? maybePosition : 0;
+    } else if (typeof targetStatusOrPosition === "number") {
+      position = targetStatusOrPosition;
+    }
+
     try {
-      const next = await viraApi.moveTask(
-        session.accessToken,
-        project.id,
-        taskId,
-        { status: task.status, position, version: task.version },
-      );
       setTasks((current) =>
-        current
-          .map((item) => (item.id === next.id ? next : item))
-          .sort((a, b) => a.position - b.position),
+        current.map((t) =>
+          String(t.id) === String(taskId)
+            ? { ...t, status: targetStatus }
+            : t,
+        ),
       );
+
+      await viraApi.moveTask(session.accessToken, project.id, task.id, {
+        status: targetStatus,
+        position,
+        version: task.version,
+      });
+
+      const [freshTasks, freshOverview] = await Promise.all([
+        viraApi.tasks(session.accessToken, project.id),
+        viraApi.overview(session.accessToken, project.id),
+      ]);
+      setTasks(freshTasks);
+      setOverview(freshOverview);
     } catch (err) {
+      const freshTasks = await viraApi
+        .tasks(session.accessToken, project.id)
+        .catch(() => null);
+      if (freshTasks) setTasks(freshTasks);
       setError(errorText(err));
     }
   };
@@ -3378,6 +3526,7 @@ function App() {
         tasks={tasks}
         open={setSelected}
         create={setCreating}
+        move={moveTask}
         token={session.accessToken}
         projectId={project.id}
         isAdmin={isAdmin}
@@ -3387,7 +3536,7 @@ function App() {
         tasks={tasks}
         open={setSelected}
         create={setCreating}
-        move={moveBacklogTask}
+        move={moveTask}
         token={session.accessToken}
         projectId={project.id}
       />
