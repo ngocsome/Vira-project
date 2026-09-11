@@ -23,6 +23,9 @@ import vn.vira.workspace.application.WorkspaceService;
 import vn.vira.workspace.domain.Workspace;
 import vn.vira.audit.application.ActivityLogService;
 
+import vn.vira.workspace.domain.WorkspaceMemberRepository;
+import vn.vira.workspace.domain.WorkspaceRole;
+
 @Service
 @RequiredArgsConstructor
 public class ProjectService {
@@ -35,6 +38,7 @@ public class ProjectService {
     private final ProjectMapper projectMapper;
     private final BoardService boardService;
     private final ActivityLogService activityLogs;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
 
     @Transactional
     public ProjectResponse create(Long workspaceId, CreateProjectRequest request) {
@@ -74,9 +78,17 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ProjectResponse> findByWorkspace(Long workspaceId) {
         workspaceService.requireMember(workspaceId);
+        Long userId = currentUser.id();
 
-        return projectRepository.findByWorkspaceIdAndArchivedAtIsNullOrderByUpdatedAtDesc(workspaceId)
-                .stream()
+        boolean isWorkspaceAdmin = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+                .map(member -> member.getRole() == WorkspaceRole.OWNER)
+                .orElse(false);
+
+        List<Project> projects = isWorkspaceAdmin
+                ? projectRepository.findByWorkspaceIdAndArchivedAtIsNullOrderByUpdatedAtDesc(workspaceId)
+                : projectRepository.findActiveByWorkspaceIdAndMemberUserId(workspaceId, userId);
+
+        return projects.stream()
                 .map(projectMapper::toResponse)
                 .toList();
     }

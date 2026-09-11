@@ -32,6 +32,7 @@ class ProjectServiceAuthorizationTest {
     @Mock private ProjectMapper mapper;
     @Mock private BoardService boards;
     @Mock private ActivityLogService activityLogs;
+    @Mock private vn.vira.workspace.domain.WorkspaceMemberRepository workspaceMembers;
 
     @Test
     void crossProjectIdorIsHiddenAsNotFound() {
@@ -67,5 +68,5 @@ class ProjectServiceAuthorizationTest {
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service().requireAdmin(42L));
     }
 
-    private ProjectService service() { return new ProjectService(projects, members, users, workspaces, currentUser, mapper, boards, activityLogs); }
+    private ProjectService service() { return new ProjectService(projects, members, users, workspaces, currentUser, mapper, boards, activityLogs, workspaceMembers); }
 }

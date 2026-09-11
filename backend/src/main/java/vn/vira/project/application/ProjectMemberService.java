@@ -17,12 +17,17 @@ import vn.vira.shared.security.CurrentUser;
 import vn.vira.user.domain.User;
 import vn.vira.user.domain.UserRepository;
 
+import vn.vira.workspace.domain.WorkspaceMember;
+import vn.vira.workspace.domain.WorkspaceMemberRepository;
+import vn.vira.workspace.domain.WorkspaceRole;
+
 @Service
 @RequiredArgsConstructor
 public class ProjectMemberService {
 
     private final ProjectService projectService;
     private final ProjectMemberRepository projectMemberRepository;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final CurrentUser currentUser;
 
@@ -51,6 +56,12 @@ public class ProjectMemberService {
         }
 
         ProjectMember member = projectMemberRepository.save(new ProjectMember(project, user, request.role()));
+
+        Long workspaceId = project.getWorkspace().getId();
+        if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, user.getId())) {
+            workspaceMemberRepository.save(new WorkspaceMember(project.getWorkspace(), user, WorkspaceRole.MEMBER));
+        }
+
         return toResponse(member);
     }
 

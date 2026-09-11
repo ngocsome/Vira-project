@@ -2645,6 +2645,10 @@ function WorkspaceSwitcher({
   const [loading, setLoading] = useState(false);
   const dropdownRef = React.useRef(null);
 
+  useEffect(() => {
+    setProjects([]);
+  }, [currentWorkspace?.id]);
+
   const loadData = useCallback(async () => {
     if (!currentWorkspace?.id) return;
     setLoading(true);
@@ -2706,44 +2710,43 @@ function WorkspaceSwitcher({
 
       {isOpen && (
         <div className="workspace-dropdown card">
-          {loading && (
-            <div className="dropdown-loading">
-              <span>Đang tải danh sách...</span>
-            </div>
-          )}
-
           <div className="dropdown-section">
             <p className="dropdown-section-title">
               DỰ ÁN TRONG WORKSPACE NÀY
             </p>
             <div className="dropdown-item-list">
-              {projects.map((p) => {
-                const isSelected = p.id === currentProject?.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`dropdown-item ${isSelected ? "selected" : ""}`}
-                    onClick={() => {
-                      setIsOpen(false);
-                      onSelectProject(p);
-                    }}
-                  >
-                    <FolderKanban size={16} className="dropdown-item-icon" />
-                    <div className="dropdown-item-content">
-                      <b className="dropdown-item-title">{p.name}</b>
-                      <span className="dropdown-item-meta">
-                        {p.projectKey} · {p.projectType}
-                      </span>
-                    </div>
-                    {isSelected && (
-                      <CheckCircle2 size={16} className="dropdown-check-icon" />
-                    )}
-                  </button>
-                );
-              })}
-              {!loading && projects.length === 0 && (
+              {loading ? (
+                <div className="dropdown-loading">
+                  <span>Đang tải danh sách dự án...</span>
+                </div>
+              ) : projects.length === 0 ? (
                 <p className="dropdown-empty-text">Chưa có dự án nào</p>
+              ) : (
+                projects.map((p) => {
+                  const isSelected = p.id === currentProject?.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`dropdown-item ${isSelected ? "selected" : ""}`}
+                      onClick={() => {
+                        setIsOpen(false);
+                        onSelectProject(p);
+                      }}
+                    >
+                      <FolderKanban size={16} className="dropdown-item-icon" />
+                      <div className="dropdown-item-content">
+                        <b className="dropdown-item-title">{p.name}</b>
+                        <span className="dropdown-item-meta">
+                          {p.projectKey} · {p.projectType}
+                        </span>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 size={16} className="dropdown-check-icon" />
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
             <button
@@ -2773,9 +2776,9 @@ function WorkspaceSwitcher({
                     key={ws.id}
                     type="button"
                     className={`dropdown-item ${isSelected ? "selected" : ""}`}
-                    onClick={() => {
+                    onClick={async () => {
                       setIsOpen(false);
-                      onSelectWorkspace(ws);
+                      await onSelectWorkspace(ws);
                     }}
                   >
                     <BriefcaseBusiness
@@ -3289,21 +3292,36 @@ function App() {
         return;
       }
       setIsNewUser(false);
-      setWorkspace(workspaces[0]);
+
+      const savedWsId = localStorage.getItem("vira.workspaceId");
+      const currentWs =
+        workspaces.find((w) => String(w.id) === savedWsId) || workspaces[0];
+      setWorkspace(currentWs);
+      localStorage.setItem("vira.workspaceId", String(currentWs.id));
+
       const projects = await viraApi.projects(
         session.accessToken,
-        workspaces[0].id,
+        currentWs.id,
       );
       if (!projects.length) {
         setProject(null);
+        localStorage.removeItem("vira.projectId");
         return;
       }
-      setProject(projects[0]);
-      await loadProject(session.accessToken, projects[0]);
+
+      const savedProjId = localStorage.getItem("vira.projectId");
+      const currentProj =
+        projects.find((p) => String(p.id) === savedProjId) || projects[0];
+      setProject(currentProj);
+      localStorage.setItem("vira.projectId", String(currentProj.id));
+
+      await loadProject(session.accessToken, currentProj);
     } catch (err) {
       setError(errorText(err));
       if (err.status === 401) {
         localStorage.removeItem("vira.session");
+        localStorage.removeItem("vira.workspaceId");
+        localStorage.removeItem("vira.projectId");
         setSession(null);
       }
     } finally {
@@ -3316,6 +3334,8 @@ function App() {
   useEffect(() => {
     const handleUnauthorized = () => {
       localStorage.removeItem("vira.session");
+      localStorage.removeItem("vira.workspaceId");
+      localStorage.removeItem("vira.projectId");
       setSession(null);
       setWorkspace(null);
       setProject(null);
@@ -3330,6 +3350,8 @@ function App() {
   const ready = async (newWorkspace, newProject) => {
     setWorkspace(newWorkspace);
     setProject(newProject);
+    localStorage.setItem("vira.workspaceId", String(newWorkspace.id));
+    localStorage.setItem("vira.projectId", String(newProject.id));
     setPage("Bảng công việc");
     await loadProject(session.accessToken, newProject);
   };
@@ -3421,17 +3443,25 @@ function App() {
     }
   };
   const chooseWorkspace = async (nextWorkspace) => {
-    setWorkspace(nextWorkspace);
     try {
-      const projects = await viraApi.projects(
+      const nextProjects = await viraApi.projects(
         session.accessToken,
         nextWorkspace.id,
       );
-      if (projects.length) {
-        setProject(projects[0]);
-        await loadProject(session.accessToken, projects[0]);
+      setWorkspace(nextWorkspace);
+      localStorage.setItem("vira.workspaceId", String(nextWorkspace.id));
+      if (nextProjects.length) {
+        const nextProj = nextProjects[0];
+        setProject(nextProj);
+        localStorage.setItem("vira.projectId", String(nextProj.id));
+        await loadProject(session.accessToken, nextProj);
       } else {
         setProject(null);
+        localStorage.removeItem("vira.projectId");
+        setTasks([]);
+        setOverview(null);
+        setSprints([]);
+        setMembers([]);
         setCreateProjectModalOpen(true);
       }
     } catch (err) {
@@ -3464,6 +3494,8 @@ function App() {
         chooseWorkspace={chooseWorkspace}
         onLogout={() => {
           localStorage.removeItem("vira.session");
+          localStorage.removeItem("vira.workspaceId");
+          localStorage.removeItem("vira.projectId");
           setSession(null);
           setWorkspace(null);
           setProject(null);
@@ -3478,11 +3510,14 @@ function App() {
           workspace={workspace}
           selectProject={async (item) => {
             setProject(item);
+            localStorage.setItem("vira.projectId", String(item.id));
             await loadProject(session.accessToken, item);
           }}
           switchWorkspace={() => {
             setProject(null);
             setWorkspace(null);
+            localStorage.removeItem("vira.projectId");
+            localStorage.removeItem("vira.workspaceId");
           }}
           archiveWorkspace={async () => {
             if (!window.confirm(`Lưu trữ workspace “${workspace.name}”?`)) return;
@@ -3490,6 +3525,8 @@ function App() {
               await viraApi.archiveWorkspace(session.accessToken, workspace.id);
               setProject(null);
               setWorkspace(null);
+              localStorage.removeItem("vira.projectId");
+              localStorage.removeItem("vira.workspaceId");
             } catch (err) {
               setError(errorText(err));
             }
@@ -3501,6 +3538,7 @@ function App() {
             workspaceId={workspace.id}
             onCreated={async (newProj) => {
               setProject(newProj);
+              localStorage.setItem("vira.projectId", String(newProj.id));
               setPage("Bảng công việc");
               await loadProject(session.accessToken, newProj);
             }}
@@ -3600,6 +3638,7 @@ function App() {
           currentProject={project}
           onSelectProject={async (p) => {
             setProject(p);
+            localStorage.setItem("vira.projectId", String(p.id));
             await loadProject(session.accessToken, p);
           }}
           onSelectWorkspace={async (ws) => {
@@ -3649,6 +3688,8 @@ function App() {
             <button
               onClick={() => {
                 localStorage.removeItem("vira.session");
+                localStorage.removeItem("vira.workspaceId");
+                localStorage.removeItem("vira.projectId");
                 setSession(null);
               }}
               aria-label="Đăng xuất"
@@ -3754,6 +3795,7 @@ function App() {
           workspaceId={workspace.id}
           onCreated={async (newProj) => {
             setProject(newProj);
+            localStorage.setItem("vira.projectId", String(newProj.id));
             setPage("Bảng công việc");
             await loadProject(session.accessToken, newProj);
           }}
@@ -3766,6 +3808,12 @@ function App() {
           onCreated={async (newWs) => {
             setWorkspace(newWs);
             setProject(null);
+            localStorage.setItem("vira.workspaceId", String(newWs.id));
+            localStorage.removeItem("vira.projectId");
+            setTasks([]);
+            setOverview(null);
+            setSprints([]);
+            setMembers([]);
             setCreateProjectModalOpen(true);
           }}
           onClose={() => setCreateWorkspaceModalOpen(false)}
