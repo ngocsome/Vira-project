@@ -2102,29 +2102,92 @@ function Setup({ token, user, ready }) {
   const [workspace, setWorkspace] = useState(null);
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
+  const [projectType, setProjectType] = useState("KANBAN");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const handleProjectNameChange = (event) => {
+    const val = event.target.value;
+    setName(val);
+    const autoKey = val
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 6)
+      .toUpperCase();
+    if (!key || key === autoKey.slice(0, -1)) {
+      setKey(autoKey);
+    }
+  };
+
   const submit = async (event) => {
     event.preventDefault();
-    setSaving(true);
     setError("");
+    setSaving(true);
     try {
       if (step === "workspace") {
-        setWorkspace(
-          await viraApi.createWorkspace(token, { name, description: "" }),
-        );
+        const createdWorkspace = await viraApi.createWorkspace(token, {
+          name: name.trim(),
+          description: "",
+        });
+        setWorkspace(createdWorkspace);
         setName("");
         setStep("project");
       } else {
-        ready(
-          workspace,
-          await viraApi.createProject(token, workspace.id, {
-            name,
-            projectKey: key.toUpperCase(),
-            description: "",
-            projectType: "KANBAN",
-          }),
-        );
+        const cleanKey = key.trim().toUpperCase();
+        if (!/^[A-Za-z][A-Za-z0-9]{1,11}$/.test(cleanKey)) {
+          setError("Mã dự án phải gồm 2-12 ký tự chữ và số, bắt đầu bằng chữ cái.");
+          setSaving(false);
+          return;
+        }
+
+        const createdProject = await viraApi.createProject(token, workspace.id, {
+          name: name.trim(),
+          projectKey: cleanKey,
+          description: "",
+          projectType,
+        });
+
+        // Tự động tạo 3 task mẫu để trải nghiệm Kanban ngay
+        try {
+          const t1 = await viraApi.createTask(token, createdProject.id, {
+            title: "👋 Chào mừng bạn đến với Vira! Bắt đầu kéo thả thẻ này",
+            description:
+              "Kéo thẻ này sang các cột 'Đang thực hiện' hoặc 'Hoàn thành' để trải nghiệm bảng Kanban trực quan.",
+            taskType: "TASK",
+            priority: "HIGH",
+            storyPoints: 2,
+          });
+
+          const t2 = await viraApi.createTask(token, createdProject.id, {
+            title: "📝 Nhấp vào thẻ để tùy biến chi tiết công việc",
+            description:
+              "Nhấp vào bất kỳ thẻ nào để mở bảng chi tiết: thêm mô tả, phân công thành viên, đính kèm tệp và để lại bình luận.",
+            taskType: "TASK",
+            priority: "MEDIUM",
+            storyPoints: 3,
+          });
+          if (t2?.id) {
+            await viraApi.updateTaskStatus(token, createdProject.id, t2.id, {
+              status: "IN_PROGRESS",
+              version: t2.version,
+            });
+          }
+
+          await viraApi.createTask(token, createdProject.id, {
+            title: "👥 Mời đồng đội cùng tham gia dự án",
+            description:
+              "Truy cập mục 'Thành viên' ở thanh điều hướng bên trái để gửi lời mời cho đồng nghiệp cùng cộng tác.",
+            taskType: "TASK",
+            priority: "MEDIUM",
+            storyPoints: 1,
+          });
+        } catch (sampleErr) {
+          console.warn("Could not create onboarding sample tasks:", sampleErr);
+        }
+
+        await ready(workspace, createdProject);
       }
     } catch (err) {
       setError(errorText(err));
@@ -2132,6 +2195,7 @@ function Setup({ token, user, ready }) {
       setSaving(false);
     }
   };
+
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -2142,13 +2206,13 @@ function Setup({ token, user, ready }) {
         <p className="eyebrow">THIẾT LẬP BAN ĐẦU</p>
         <h1>
           {step === "workspace"
-            ? `Chào ${user.fullName}`
+            ? `Chào ${user?.fullName || "bạn"}`
             : "Tạo dự án đầu tiên"}
         </h1>
         <p>
           {step === "workspace"
             ? "Tạo không gian để nhóm cùng làm việc."
-            : "Dự án sẽ có backlog và bảng Kanban riêng."}
+            : "Dự án sẽ có bảng Kanban và công việc mẫu để bạn khám phá ngay."}
         </p>
         <form onSubmit={submit}>
           {error && <p className="form-error">{error}</p>}
@@ -2157,31 +2221,468 @@ function Setup({ token, user, ready }) {
             <input
               required
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              placeholder={
+                step === "workspace"
+                  ? "Ví dụ: Công ty Vira"
+                  : "Ví dụ: Dự án Khởi đầu"
+              }
+              onChange={
+                step === "workspace"
+                  ? (e) => setName(e.target.value)
+                  : handleProjectNameChange
+              }
             />
           </label>
           {step === "project" && (
-            <label>
-              Mã dự án
-              <input
-                required
-                pattern="[A-Za-z][A-Za-z0-9]{1,11}"
-                value={key}
-                onChange={(event) => setKey(event.target.value)}
-                placeholder="Ví dụ: VIRA"
-              />
-            </label>
+            <>
+              <div className="form-grid">
+                <label>
+                  Mã dự án (Key)
+                  <input
+                    required
+                    pattern="[A-Za-z][A-Za-z0-9]{1,11}"
+                    maxLength={12}
+                    style={{ textTransform: "uppercase" }}
+                    value={key}
+                    onChange={(event) => setKey(event.target.value.toUpperCase())}
+                    placeholder="Ví dụ: VIRA"
+                  />
+                </label>
+                <label>
+                  Quy trình
+                  <select
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
+                  >
+                    <option value="KANBAN">Kanban</option>
+                    <option value="SCRUM">Scrum</option>
+                  </select>
+                </label>
+              </div>
+            </>
           )}
           <button className="btn primary auth-submit" disabled={saving}>
             {saving
-              ? "Đang tạo..."
+              ? "Đang thiết lập..."
               : step === "workspace"
                 ? "Tiếp tục"
-                : "Vào dự án"}
+                : "Hoàn tất & Khám phá"}
           </button>
+          {step === "project" && (
+            <button
+              type="button"
+              className="text-btn"
+              style={{ marginTop: "12px", width: "100%", textAlign: "center" }}
+              onClick={() => {
+                setStep("workspace");
+                setName(workspace?.name || "");
+                setError("");
+              }}
+            >
+              ← Quay lại bước trước
+            </button>
+          )}
         </form>
       </section>
     </main>
+  );
+}
+
+function CreateProjectModal({ token, workspaceId, onCreated, onClose }) {
+  const [name, setName] = useState("");
+  const [projectKey, setProjectKey] = useState("");
+  const [projectType, setProjectType] = useState("KANBAN");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setName(val);
+    const autoKey = val
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 6)
+      .toUpperCase();
+    if (!projectKey || projectKey === autoKey.slice(0, -1)) {
+      setProjectKey(autoKey);
+    }
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const cleanKey = projectKey.trim().toUpperCase();
+    if (!/^[A-Za-z][A-Za-z0-9]{1,11}$/.test(cleanKey)) {
+      setError("Mã dự án phải gồm 2-12 ký tự chữ và số, bắt đầu bằng chữ cái.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const created = await viraApi.createProject(token, workspaceId, {
+        name: name.trim(),
+        projectKey: cleanKey,
+        projectType,
+        description: description.trim(),
+      });
+      onCreated(created);
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="modal-layer"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <form className="task-modal form-modal" onSubmit={submit}>
+        <div className="modal-top">
+          <span className="type">DỰ ÁN MỚI</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-btn"
+            aria-label="Đóng"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <h2>Tạo dự án mới</h2>
+        {error && <p className="form-error">{error}</p>}
+        <label>
+          Tên dự án
+          <input
+            required
+            placeholder="Ví dụ: Phát triển Cổng thông tin"
+            value={name}
+            onChange={handleNameChange}
+          />
+        </label>
+        <div className="form-grid">
+          <label>
+            Mã dự án (Key)
+            <input
+              required
+              maxLength={12}
+              style={{ textTransform: "uppercase" }}
+              placeholder="VD: PORTAL"
+              value={projectKey}
+              onChange={(e) => setProjectKey(e.target.value.toUpperCase())}
+            />
+          </label>
+          <label>
+            Loại quy trình
+            <select
+              value={projectType}
+              onChange={(e) => setProjectType(e.target.value)}
+            >
+              <option value="KANBAN">Kanban</option>
+              <option value="SCRUM">Scrum</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Mô tả (không bắt buộc)
+          <textarea
+            placeholder="Mô tả ngắn gọn về mục tiêu dự án..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
+        <div className="form-actions">
+          <button type="button" className="btn secondary" onClick={onClose}>
+            Hủy
+          </button>
+          <button className="btn primary" disabled={saving}>
+            {saving ? "Đang tạo..." : "Tạo dự án"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function CreateWorkspaceModal({ token, onCreated, onClose }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const created = await viraApi.createWorkspace(token, {
+        name: name.trim(),
+        description: description.trim(),
+      });
+      onCreated(created);
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="modal-layer"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <form className="task-modal form-modal" onSubmit={submit}>
+        <div className="modal-top">
+          <span className="type">KHÔNG GIAN LÀM VIỆC MỚI</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-btn"
+            aria-label="Đóng"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <h2>Tạo không gian làm việc</h2>
+        {error && <p className="form-error">{error}</p>}
+        <label>
+          Tên không gian làm việc
+          <input
+            required
+            placeholder="Ví dụ: Công ty Vira, Đội Phát triển..."
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label>
+          Mô tả (không bắt buộc)
+          <textarea
+            placeholder="Mô tả mục đích của không gian làm việc này..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
+        <div className="form-actions">
+          <button type="button" className="btn secondary" onClick={onClose}>
+            Hủy
+          </button>
+          <button className="btn primary" disabled={saving}>
+            {saving ? "Đang tạo..." : "Tạo không gian làm việc"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function WorkspaceSwitcher({
+  token,
+  currentWorkspace,
+  currentProject,
+  onSelectProject,
+  onSelectWorkspace,
+  onOpenCreateProject,
+  onOpenCreateWorkspace,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  const loadData = useCallback(async () => {
+    if (!currentWorkspace?.id) return;
+    setLoading(true);
+    try {
+      const [allWorkspaces, wsProjects] = await Promise.all([
+        viraApi.workspaces(token),
+        viraApi.projects(token, currentWorkspace.id),
+      ]);
+      setWorkspaces(allWorkspaces);
+      setProjects(wsProjects);
+    } catch {
+      // silently handle
+    } finally {
+      setLoading(false);
+    }
+  }, [token, currentWorkspace?.id]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData();
+    }
+  }, [isOpen, loadData]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="workspace-switcher-wrap" ref={dropdownRef}>
+      <button
+        type="button"
+        className={`workspace ${isOpen ? "open" : ""}`}
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-label="Chuyển đổi dự án hoặc không gian làm việc"
+      >
+        <div className="workspace-icon">
+          {initials(currentWorkspace?.name || "V")}
+        </div>
+        <div>
+          <b>{currentWorkspace?.name}</b>
+          <span>{currentProject?.name || "Chọn dự án"}</span>
+        </div>
+        <ChevronDown
+          size={16}
+          className={`chevron-icon ${isOpen ? "rotate" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="workspace-dropdown card">
+          {loading && (
+            <div className="dropdown-loading">
+              <span>Đang tải danh sách...</span>
+            </div>
+          )}
+
+          <div className="dropdown-section">
+            <p className="dropdown-section-title">
+              DỰ ÁN TRONG WORKSPACE NÀY
+            </p>
+            <div className="dropdown-item-list">
+              {projects.map((p) => {
+                const isSelected = p.id === currentProject?.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`dropdown-item ${isSelected ? "selected" : ""}`}
+                    onClick={() => {
+                      setIsOpen(false);
+                      onSelectProject(p);
+                    }}
+                  >
+                    <FolderKanban size={16} className="dropdown-item-icon" />
+                    <div className="dropdown-item-content">
+                      <b className="dropdown-item-title">{p.name}</b>
+                      <span className="dropdown-item-meta">
+                        {p.projectKey} · {p.projectType}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <CheckCircle2 size={16} className="dropdown-check-icon" />
+                    )}
+                  </button>
+                );
+              })}
+              {!loading && projects.length === 0 && (
+                <p className="dropdown-empty-text">Chưa có dự án nào</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="dropdown-action-btn"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenCreateProject();
+              }}
+            >
+              <Plus size={15} />
+              <span>Tạo dự án mới...</span>
+            </button>
+          </div>
+
+          <div className="dropdown-divider" />
+
+          <div className="dropdown-section">
+            <p className="dropdown-section-title">
+              KHÔNG GIAN LÀM VIỆC CỦA BẠN
+            </p>
+            <div className="dropdown-item-list">
+              {workspaces.map((ws) => {
+                const isSelected = ws.id === currentWorkspace?.id;
+                return (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    className={`dropdown-item ${isSelected ? "selected" : ""}`}
+                    onClick={() => {
+                      setIsOpen(false);
+                      onSelectWorkspace(ws);
+                    }}
+                  >
+                    <BriefcaseBusiness
+                      size={16}
+                      className="dropdown-item-icon"
+                    />
+                    <div className="dropdown-item-content">
+                      <b className="dropdown-item-title">{ws.name}</b>
+                    </div>
+                    {isSelected && (
+                      <CheckCircle2 size={16} className="dropdown-check-icon" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              className="dropdown-action-btn"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenCreateWorkspace();
+              }}
+            >
+              <Plus size={15} />
+              <span>Tạo không gian làm việc mới...</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2626,6 +3127,9 @@ function App() {
   );
   const [workspace, setWorkspace] = useState(null);
   const [project, setProject] = useState(null);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [overview, setOverview] = useState(null);
   const [sprints, setSprints] = useState([]);
@@ -2655,10 +3159,12 @@ function App() {
     try {
       const workspaces = await viraApi.workspaces(session.accessToken);
       if (!workspaces.length) {
+        setIsNewUser(true);
         setWorkspace(null);
         setProject(null);
         return;
       }
+      setIsNewUser(false);
       setWorkspace(workspaces[0]);
       const projects = await viraApi.projects(
         session.accessToken,
@@ -2700,6 +3206,7 @@ function App() {
   const ready = async (newWorkspace, newProject) => {
     setWorkspace(newWorkspace);
     setProject(newProject);
+    setPage("Bảng công việc");
     await loadProject(session.accessToken, newProject);
   };
   const create = async (payload, status) => {
@@ -2767,14 +3274,21 @@ function App() {
   };
   const chooseWorkspace = async (nextWorkspace) => {
     setWorkspace(nextWorkspace);
-    const projects = await viraApi.projects(
-      session.accessToken,
-      nextWorkspace.id,
-    );
-    if (projects.length) {
-      setProject(projects[0]);
-      await loadProject(session.accessToken, projects[0]);
-    } else setProject(null);
+    try {
+      const projects = await viraApi.projects(
+        session.accessToken,
+        nextWorkspace.id,
+      );
+      if (projects.length) {
+        setProject(projects[0]);
+        await loadProject(session.accessToken, projects[0]);
+      } else {
+        setProject(null);
+        setCreateProjectModalOpen(true);
+      }
+    } catch (err) {
+      setError(errorText(err));
+    }
   };
   if (!session) return <Auth authenticated={authenticated} />;
   if (loading)
@@ -2783,6 +3297,17 @@ function App() {
         <div className="loading-spinner" />
         <p>Đang kết nối dữ liệu dự án...</p>
       </main>
+    );
+  if (isNewUser)
+    return (
+      <Setup
+        token={session.accessToken}
+        user={session.user}
+        ready={async (ws, proj) => {
+          setIsNewUser(false);
+          await ready(ws, proj);
+        }}
+      />
     );
   if (!workspace)
     return (
@@ -2799,28 +3324,42 @@ function App() {
     );
   if (!project)
     return (
-      <WorkspaceHome
-        token={session.accessToken}
-        workspace={workspace}
-        selectProject={async (item) => {
-          setProject(item);
-          await loadProject(session.accessToken, item);
-        }}
-        switchWorkspace={() => {
-          setProject(null);
-          setWorkspace(null);
-        }}
-        archiveWorkspace={async () => {
-          if (!window.confirm(`Lưu trữ workspace “${workspace.name}”?`)) return;
-          try {
-            await viraApi.archiveWorkspace(session.accessToken, workspace.id);
+      <>
+        <WorkspaceHome
+          token={session.accessToken}
+          workspace={workspace}
+          selectProject={async (item) => {
+            setProject(item);
+            await loadProject(session.accessToken, item);
+          }}
+          switchWorkspace={() => {
             setProject(null);
             setWorkspace(null);
-          } catch (err) {
-            setError(errorText(err));
-          }
-        }}
-      />
+          }}
+          archiveWorkspace={async () => {
+            if (!window.confirm(`Lưu trữ workspace “${workspace.name}”?`)) return;
+            try {
+              await viraApi.archiveWorkspace(session.accessToken, workspace.id);
+              setProject(null);
+              setWorkspace(null);
+            } catch (err) {
+              setError(errorText(err));
+            }
+          }}
+        />
+        {createProjectModalOpen && (
+          <CreateProjectModal
+            token={session.accessToken}
+            workspaceId={workspace.id}
+            onCreated={async (newProj) => {
+              setProject(newProj);
+              setPage("Bảng công việc");
+              await loadProject(session.accessToken, newProj);
+            }}
+            onClose={() => setCreateProjectModalOpen(false)}
+          />
+        )}
+      </>
     );
   const currentMember = members.find((m) => m.userId === session?.user?.id);
   const myRole = currentMember?.role || (project?.ownerId === session?.user?.id ? "OWNER" : "MEMBER");
@@ -2906,14 +3445,20 @@ function App() {
             <X />
           </button>
         </div>
-        <div className="workspace">
-          <div className="workspace-icon">V</div>
-          <div>
-            <b>{workspace.name}</b>
-            <span>{project.name}</span>
-          </div>
-          <ChevronDown size={16} />
-        </div>
+        <WorkspaceSwitcher
+          token={session.accessToken}
+          currentWorkspace={workspace}
+          currentProject={project}
+          onSelectProject={async (p) => {
+            setProject(p);
+            await loadProject(session.accessToken, p);
+          }}
+          onSelectWorkspace={async (ws) => {
+            await chooseWorkspace(ws);
+          }}
+          onOpenCreateProject={() => setCreateProjectModalOpen(true)}
+          onOpenCreateWorkspace={() => setCreateWorkspaceModalOpen(true)}
+        />
         <nav>
           <p className="nav-label">DỰ ÁN</p>
           {NAV.map(([id, Icon]) => (
@@ -3052,6 +3597,29 @@ function App() {
           close={() => setCreating(null)}
           submit={create}
           defaultStatus={creating}
+        />
+      )}
+      {createProjectModalOpen && workspace && (
+        <CreateProjectModal
+          token={session.accessToken}
+          workspaceId={workspace.id}
+          onCreated={async (newProj) => {
+            setProject(newProj);
+            setPage("Bảng công việc");
+            await loadProject(session.accessToken, newProj);
+          }}
+          onClose={() => setCreateProjectModalOpen(false)}
+        />
+      )}
+      {createWorkspaceModalOpen && (
+        <CreateWorkspaceModal
+          token={session.accessToken}
+          onCreated={async (newWs) => {
+            setWorkspace(newWs);
+            setProject(null);
+            setCreateProjectModalOpen(true);
+          }}
+          onClose={() => setCreateWorkspaceModalOpen(false)}
         />
       )}
     </div>
