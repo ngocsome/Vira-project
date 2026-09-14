@@ -1,5 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 :root {
+  --font-sans: "Plus Jakarta Sans", "Segoe UI", sans-serif;
   --primary: #2563eb;
   --ink: #172033;
   --muted: #64748b;
@@ -113,10 +114,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font:
-    14px/1.55 "Be Vietnam Pro",
-    "Noto Sans",
-    sans-serif;
+  font: 14px/1.55 var(--font-sans);
 }
 button,
 input {
@@ -1565,10 +1563,9 @@ main {
 }
 body {
   font:
-    var(--text-sm)/1.6 "Be Vietnam Pro",
-    "Noto Sans",
-    sans-serif;
+    var(--text-sm)/1.6 var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 .sidebar nav button,
@@ -1593,7 +1590,8 @@ body {
 .page-head h1 {
   font-size: clamp(27px, 2.2vw, 32px);
   line-height: 1.22;
-  letter-spacing: -1px;
+  font-weight: 800;
+  letter-spacing: -1.15px;
 }
 .welcome > div > p:last-child,
 .page-head > div > p:last-child {
@@ -1620,6 +1618,8 @@ body {
 .section-title h2 {
   font-size: 16px;
   line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: -0.28px;
 }
 .activity-row p {
   font-size: var(--text-sm);
@@ -1638,7 +1638,8 @@ body {
 }
 .board-toolbar h2 {
   font-size: 24px;
-  letter-spacing: -0.5px;
+  font-weight: 800;
+  letter-spacing: -0.75px;
 }
 .board-toolbar p,
 .column-head,
@@ -1654,6 +1655,8 @@ body {
 .task-modal h2 {
   font-size: var(--text-xl);
   line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: -0.55px;
 }
 .task-collaboration-actions {
   display: flex;
