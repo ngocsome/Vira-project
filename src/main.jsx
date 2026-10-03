@@ -323,6 +323,7 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverColumnId, setDragOverColumnId] = useState(null);
   const [dragOverTaskId, setDragOverTaskId] = useState(null);
+  const [newColumn, setNewColumn] = useState({ name: "", taskStatus: "", wipLimit: "" });
 
   useEffect(() => {
     viraApi
@@ -346,6 +347,9 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
       setError(errorText(err));
     }
   };
+  const createColumn = async (event) => { event.preventDefault(); try { const next = await viraApi.createBoardColumn(token, projectId, { ...newColumn, wipLimit: newColumn.wipLimit === "" ? null : Number(newColumn.wipLimit) }); setColumns((current) => [...current, next]); setNewColumn({ name: "", taskStatus: "", wipLimit: "" }); } catch (err) { setError(errorText(err)); } };
+  const reorderColumn = async (columnId, offset) => { const index = columns.findIndex((item) => item.id === columnId); const target = index + offset; if (target < 0 || target >= columns.length) return; const next = [...columns]; [next[index], next[target]] = [next[target], next[index]]; try { await viraApi.reorderBoardColumns(token, projectId, next.map((item) => item.id)); setColumns(next.map((item, position) => ({ ...item, position: position + 1 }))); } catch (err) { setError(errorText(err)); } };
+  const removeColumn = async (column) => { if (!window.confirm(`Xóa cột “${column.name}”? Cột phải không có công việc.`)) return; try { await viraApi.deleteBoardColumn(token, projectId, column.id); setColumns((current) => current.filter((item) => item.id !== column.id)); } catch (err) { setError(errorText(err)); } };
 
   const handleDragStart = (e, task) => {
     e.dataTransfer.setData("text/plain", String(task.id));
@@ -427,12 +431,9 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
           <h3>Cấu hình cột và giới hạn WIP</h3>
           <p>Đặt WIP để cảnh báo khi cột có quá nhiều công việc đang mở.</p>
           {columns.map((column) => (
-            <WipColumnEditor
-              key={column.id}
-              column={column}
-              save={saveColumn}
-            />
+            <div className="board-column-config" key={column.id}><WipColumnEditor column={column} save={saveColumn} /><div className="inline-actions"><button type="button" className="text-btn" onClick={() => reorderColumn(column.id, -1)}>←</button><button type="button" className="text-btn" onClick={() => reorderColumn(column.id, 1)}>→</button><button type="button" className="text-btn danger" onClick={() => removeColumn(column)}>Xóa</button></div></div>
           ))}
+          <form className="inline-form" onSubmit={createColumn}><label>Tên cột<input required value={newColumn.name} onChange={(e) => setNewColumn({ ...newColumn, name: e.target.value })} /></label><label>Trạng thái<select required value={newColumn.taskStatus} onChange={(e) => setNewColumn({ ...newColumn, taskStatus: e.target.value })}><option value="">Chọn trạng thái</option>{Object.keys(STATUS).filter((status) => !columns.some((column) => column.taskStatus === status)).map((status) => <option key={status} value={status}>{STATUS[status][0]}</option>)}</select></label><label>WIP<input type="number" min="1" value={newColumn.wipLimit} onChange={(e) => setNewColumn({ ...newColumn, wipLimit: e.target.value })} /></label><button className="btn secondary">Thêm cột</button></form>
         </div>
       )}
       <div className="board">
@@ -1806,6 +1807,8 @@ function SprintPage({ token, project, tasks, sprints, reload, isAdmin }) {
     endDate: "",
   });
   const [error, setError] = useState("");
+  const [completing, setCompleting] = useState(null);
+  const [targetSprintId, setTargetSprintId] = useState("");
   const create = async (e) => {
     e.preventDefault();
     try {
@@ -1877,15 +1880,10 @@ function SprintPage({ token, project, tasks, sprints, reload, isAdmin }) {
               </button>
             )}
             {isAdmin && sprint.status === "ACTIVE" && (
-              <button
-                className="btn secondary"
-                onClick={async () => {
-                  await viraApi.completeSprint(token, project.id, sprint.id);
-                  reload();
-                }}
-              >
-                Kết thúc
-              </button>
+              <>
+                {completing === sprint.id && <label className="inline-choice">Chuyển việc chưa xong đến<select value={targetSprintId} onChange={(e) => setTargetSprintId(e.target.value)}><option value="">Backlog</option>{sprints.filter((item) => item.id !== sprint.id && item.status !== "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+                <button className="btn secondary" onClick={async () => { if (completing !== sprint.id) { setCompleting(sprint.id); return; } try { await viraApi.completeSprint(token, project.id, sprint.id, targetSprintId ? Number(targetSprintId) : null); setCompleting(null); setTargetSprintId(""); reload(); } catch (err) { setError(errorText(err)); } }}>{completing === sprint.id ? "Xác nhận kết thúc" : "Kết thúc"}</button>
+              </>
             )}
           </article>
         ))}
@@ -1899,6 +1897,9 @@ function SprintPage({ token, project, tasks, sprints, reload, isAdmin }) {
             <select
               value={task.sprintId || ""}
               onChange={async (e) => {
+                if (e.target.value && !task.estimatedHours && task.storyPoints == null) {
+                  setError(`Cảnh báo: ${task.taskCode} chưa có giờ ước lượng hoặc Story Point.`);
+                }
                 await viraApi.assignSprint(
                   token,
                   project.id,
@@ -1925,10 +1926,13 @@ function MembersPage({ token, project, currentUser }) {
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("MEMBER");
+  const [teams, setTeams] = useState([]);
+  const [teamName, setTeamName] = useState("");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
       setMembers(await viraApi.members(token, project.id));
+      setTeams(await viraApi.teams(token, project.id));
     } catch (err) {
       setError(errorText(err));
     }
@@ -2023,6 +2027,12 @@ function MembersPage({ token, project, currentUser }) {
           </article>
         ))}
       </div>
+      <section className="card team-manager">
+        <h2>Nhóm chuyên môn</h2>
+        <p>Tổ chức thành viên theo nhóm như Backend, Frontend hoặc Kiểm thử.</p>
+        {canManage && <form className="inline-form" onSubmit={async (e) => { e.preventDefault(); try { await viraApi.createTeam(token, project.id, { name: teamName, description: null }); setTeamName(""); load(); } catch (err) { setError(errorText(err)); } }}><label>Tên nhóm<input required value={teamName} onChange={(e) => setTeamName(e.target.value)} /></label><button className="btn secondary">Tạo nhóm</button></form>}
+        <div className="entity-list">{teams.map((team) => <article className="entity-row" key={team.id}><div><b>{team.name}</b><span>{team.members.map((member) => member.fullName).join(", ") || "Chưa có thành viên"}</span></div>{canManage && <button className="text-btn" onClick={async () => { const entered = window.prompt("Nhập email thành viên, ngăn cách bằng dấu phẩy", team.members.map((member) => member.email).join(", ")); if (entered === null) return; const emails = entered.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean); const userIds = members.filter((member) => emails.includes(member.email.toLowerCase())).map((member) => member.userId); if (userIds.length !== emails.length) { setError("Một hoặc nhiều email không thuộc dự án."); return; } try { await viraApi.updateTeamMembers(token, project.id, team.id, userIds); load(); } catch (err) { setError(errorText(err)); } }}>Phân công thành viên</button>}</article>)}{!teams.length && <p>Chưa có nhóm chuyên môn.</p>}</div>
+      </section>
     </section>
   );
 }
@@ -2030,10 +2040,10 @@ function NotificationBell({ token }) {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    viraApi
-      .notifications(token)
-      .then(setItems)
-      .catch(() => {});
+    const refresh = () => viraApi.notifications(token).then(setItems).catch(() => {});
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(timer);
   }, [token]);
   const unread = items.filter((item) => !item.readAt).length;
   return (
@@ -3282,6 +3292,7 @@ function App() {
   }, []);
   const bootstrap = useCallback(async () => {
     if (!session) return;
+    setError("");
     setLoading(true);
     try {
       const workspaces = await viraApi.workspaces(session.accessToken);

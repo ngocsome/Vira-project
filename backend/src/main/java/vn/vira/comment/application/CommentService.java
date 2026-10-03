@@ -1,6 +1,7 @@
 package vn.vira.comment.application;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,8 @@ import vn.vira.user.domain.UserRepository;
 import vn.vira.task.application.TaskNotificationService;
 import vn.vira.audit.application.ActivityLogService;
 import vn.vira.task.application.TaskAuthorizationService;
+import vn.vira.notification.application.NotificationService;
+import vn.vira.project.domain.ProjectMemberRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,9 @@ public class CommentService {
     private final TaskNotificationService taskNotifications;
     private final ActivityLogService activityLogs;
     private final TaskAuthorizationService taskAuthorizationService;
+    private final NotificationService notificationService;
+    private final ProjectMemberRepository projectMembers;
+    private static final Pattern MENTION = Pattern.compile("(?<![\\w@])@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})");
 
     @Transactional(readOnly = true)
     public List<CommentResponse> findByTask(Long projectId, Long taskId) {
@@ -56,6 +62,11 @@ public class CommentService {
         Comment comment = commentRepository.save(new Comment(task, author, parent, request.body().trim()));
         activityLogs.record(task, "COMMENT_CREATED", "Thêm bình luận");
         taskNotifications.notifyParticipants(task, "TASK_COMMENT", "Bình luận mới tại " + task.getTaskCode(), request.body().trim());
+        MENTION.matcher(request.body()).results().map(result -> result.group(1)).distinct().forEach(email ->
+                userRepository.findByEmailIgnoreCase(email).filter(user ->
+                        !user.getId().equals(author.getId()) && projectMembers.existsByProjectIdAndUserIdAndRemovedAtIsNull(projectId, user.getId())
+                ).ifPresent(user -> notificationService.create(user, "COMMENT_MENTION", "Bạn được nhắc trong " + task.getTaskCode(), request.body().trim(), "/projects/" + projectId + "/tasks/" + taskId))
+        );
         return toResponse(comment);
     }
 

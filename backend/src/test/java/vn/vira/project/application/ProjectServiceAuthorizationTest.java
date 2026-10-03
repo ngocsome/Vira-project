@@ -21,6 +21,7 @@ import vn.vira.shared.exception.NotFoundException;
 import vn.vira.shared.security.CurrentUser;
 import vn.vira.user.domain.UserRepository;
 import vn.vira.workspace.application.WorkspaceService;
+import vn.vira.task.domain.ProjectTaskCounterRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ProjectServiceAuthorizationTest {
@@ -33,6 +34,7 @@ class ProjectServiceAuthorizationTest {
     @Mock private BoardService boards;
     @Mock private ActivityLogService activityLogs;
     @Mock private vn.vira.workspace.domain.WorkspaceMemberRepository workspaceMembers;
+    @Mock private ProjectTaskCounterRepository taskCounters;
 
     @Test
     void crossProjectIdorIsHiddenAsNotFound() {
@@ -68,5 +70,5 @@ class ProjectServiceAuthorizationTest {
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service().requireAdmin(42L));
     }
 
-    private ProjectService service() { return new ProjectService(projects, members, users, workspaces, currentUser, mapper, boards, activityLogs, workspaceMembers); }
+    private ProjectService service() { return new ProjectService(projects, members, users, workspaces, currentUser, mapper, boards, activityLogs, workspaceMembers, taskCounters); }
 }

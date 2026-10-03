@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,8 +48,9 @@ public class SprintController {
     @PatchMapping("/{sprintId}/complete")
     public ApiResponse<SprintResponse> complete(
             @PathVariable Long projectId,
-            @PathVariable Long sprintId
+            @PathVariable Long sprintId,
+            @RequestBody(required = false) CompleteSprintRequest request
     ) {
-        return ApiResponse.ok(sprintService.complete(projectId, sprintId), "Kết thúc Sprint thành công");
+        return ApiResponse.ok(sprintService.complete(projectId, sprintId, request), "Kết thúc Sprint thành công");
     }
 }

@@ -39,4 +39,8 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
             Long projectId,
             TaskStatus status
     );
+
+    List<Task> findByProjectIdAndSprintIdAndStatusNotAndDeletedAtIsNull(Long projectId, Long sprintId, TaskStatus status);
+
+    List<Task> findByDueDateBetweenAndStatusNotAndDeletedAtIsNull(java.time.LocalDate from, java.time.LocalDate to, TaskStatus status);
 }

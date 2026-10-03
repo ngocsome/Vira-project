@@ -1,0 +1,1 @@
+ALTER TABLE project_teams ADD COLUMN version BIGINT NOT NULL DEFAULT 0 AFTER id;
