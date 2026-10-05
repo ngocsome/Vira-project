@@ -120,7 +120,11 @@ async function main() {
   // 6. Tạo task DEMO-101
   console.log("\n6. Tạo task DEMO-101...");
   const tasksRes = await get(`/projects/${project.id}/tasks`, token);
-  let existingTask = tasksRes.data?.data?.find(t => t.taskCode === "DEMO-101");
+  const existingTasks = tasksRes.data?.data || [];
+  const existingTaskTitles = new Set(
+    existingTasks.map(task => task.title.trim().toLowerCase()),
+  );
+  let existingTask = existingTasks.find(t => t.taskCode === "DEMO-101");
   let taskId = existingTask?.id;
 
   if (!existingTask) {
@@ -137,6 +141,7 @@ async function main() {
     if (createTaskRes.ok) {
       const created = createTaskRes.data?.data;
       taskId = created.id;
+      existingTaskTitles.add(created.title.trim().toLowerCase());
       console.log(` - Tạo task thành công: [${created.taskCode}] ${created.title} (ID: ${created.id})`);
     } else {
       console.log(" - Lỗi tạo task:", createTaskRes.data);
@@ -174,9 +179,14 @@ async function main() {
   ];
 
   for (const t of extraTasks) {
+    if (existingTaskTitles.has(t.title.trim().toLowerCase())) {
+      console.log(` - Task demo đã tồn tại, bỏ qua: ${t.title}`);
+      continue;
+    }
     const res = await post(`/projects/${project.id}/tasks`, t, token);
     if (res.ok) {
       console.log(` - Đã tạo task: [${res.data?.data?.taskCode}] ${t.title}`);
+      existingTaskTitles.add(t.title.trim().toLowerCase());
     }
   }
 

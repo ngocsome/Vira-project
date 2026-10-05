@@ -11,5 +11,6 @@ public interface TaskMapper {
     @Mapping(target = "parentTaskId", source = "parentTask.id")
     @Mapping(target = "reporterId", source = "reporter.id")
     @Mapping(target = "sprintId", source = "sprint.id")
+    @Mapping(target = "assigneeIds", expression = "java(task.getAssignees().stream().map(user -> user.getId()).toList())")
     TaskResponse toResponse(Task task);
 }

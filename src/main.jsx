@@ -93,6 +93,15 @@ const errorText = (error) =>
   error?.status === 401
     ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
     : error?.message || "Đã có lỗi xảy ra.";
+const canEditTaskAs = (task, currentUserId, isAdmin) =>
+  Boolean(
+    task &&
+      (isAdmin ||
+        String(task.reporterId) === String(currentUserId) ||
+        task.assigneeIds?.some(
+          (userId) => String(userId) === String(currentUserId),
+        )),
+  );
 
 function Metric({ label, value, note, kind, Icon }) {
   return (
@@ -316,7 +325,7 @@ function Overview({ overview, tasks, open, create }) {
     </>
   );
 }
-function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
+function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUserId }) {
   const [columns, setColumns] = useState([]);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -478,7 +487,7 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin }) {
                     task={task}
                     key={task.id}
                     open={open}
-                    draggable={true}
+                    draggable={canEditTaskAs(task, currentUserId, isAdmin)}
                     isDragging={draggedTaskId === task.id}
                     isDragOver={dragOverTaskId === task.id}
                     onDragStart={(e) => handleDragStart(e, task)}
@@ -553,7 +562,7 @@ function WipColumnEditor({ column, save }) {
     </form>
   );
 }
-function Backlog({ tasks, open, create, move, token, projectId }) {
+function Backlog({ tasks, open, create, move, token, projectId, isAdmin, currentUserId }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -696,8 +705,10 @@ function Backlog({ tasks, open, create, move, token, projectId }) {
           <button
             className="backlog-row"
             key={task.id}
-            draggable
-            onDragStart={() => setDraggedId(task.id)}
+            draggable={canEditTaskAs(task, currentUserId, isAdmin)}
+            onDragStart={() => {
+              if (canEditTaskAs(task, currentUserId, isAdmin)) setDraggedId(task.id);
+            }}
             onDragOver={(event) => event.preventDefault()}
             onDrop={() => {
               if (draggedId && draggedId !== task.id)
@@ -1164,8 +1175,11 @@ function TaskDetails({
   update,
   token,
   projectId,
+  currentUserId,
+  isAdmin,
   sprints,
   tasks,
+  refreshTask,
 }) {
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
@@ -1228,6 +1242,7 @@ function TaskDetails({
     load();
   }, [load]);
   if (!task) return null;
+  const canEditTask = canEditTaskAs(task, currentUserId, isAdmin);
   const addComment = async () => {
     if (!comment.trim()) return;
     try {
@@ -1283,6 +1298,7 @@ function TaskDetails({
     try {
       setError("");
       setCollaboration(await action());
+      await refreshTask(task.id);
     } catch (err) {
       setError(errorText(err));
     }
@@ -1310,6 +1326,7 @@ function TaskDetails({
             : [...ids, labelId],
         ),
       );
+      await refreshTask(task.id);
     } catch (err) {
       setError(errorText(err));
     }
@@ -1400,7 +1417,7 @@ function TaskDetails({
                   {item.pinned && <Pin size={13} />}
                   <p>{item.body}</p>
                 </div>
-                <button
+                {isAdmin && <button
                   onClick={async () => {
                     await viraApi.toggleCommentPin(
                       token,
@@ -1413,15 +1430,17 @@ function TaskDetails({
                   aria-label="Ghim bình luận"
                 >
                   <Pin size={15} />
-                </button>
+                </button>}
               </div>
             ))}
             <h3>Tệp đính kèm</h3>
-            <label className="upload-control">
-              <Paperclip size={16} />
-              Tải tệp lên
-              <input type="file" onChange={uploadFile} />
-            </label>
+            {canEditTask && (
+              <label className="upload-control">
+                <Paperclip size={16} />
+                Tải tệp lên
+                <input type="file" onChange={uploadFile} />
+              </label>
+            )}
             {attachments.map((item) => (
               <button
                 key={item.id}
@@ -1451,12 +1470,14 @@ function TaskDetails({
                   <input
                     placeholder="Môi trường"
                     value={bug.environment || ""}
+                    disabled={!canEditTask}
                     onChange={(e) =>
                       setBug({ ...bug, environment: e.target.value })
                     }
                   />
                   <select
                     value={bug.severity || "MEDIUM"}
+                    disabled={!canEditTask}
                     onChange={(e) =>
                       setBug({ ...bug, severity: e.target.value })
                     }
@@ -1469,13 +1490,15 @@ function TaskDetails({
                   <textarea
                     placeholder="Các bước tái hiện"
                     value={bug.reproductionSteps || ""}
+                    disabled={!canEditTask}
                     onChange={(e) =>
-                      setBug({ ...bug, actualResult: e.target.value })
+                      setBug({ ...bug, reproductionSteps: e.target.value })
                     }
                   />
                   <textarea
                     placeholder="Kết quả mong đợi"
                     value={bug.expectedResult || ""}
+                    disabled={!canEditTask}
                     onChange={(e) =>
                       setBug({ ...bug, expectedResult: e.target.value })
                     }
@@ -1483,15 +1506,26 @@ function TaskDetails({
                   <textarea
                     placeholder="Kết quả thực tế"
                     value={bug.actualResult || ""}
+                    disabled={!canEditTask}
                     onChange={(e) =>
-                      setBug({ ...bug, reproductionSteps: e.target.value })
+                      setBug({ ...bug, actualResult: e.target.value })
+                    }
+                  />
+                  <input
+                    placeholder="Phiên bản bị ảnh hưởng"
+                    value={bug.affectedVersion || ""}
+                    disabled={!canEditTask}
+                    onChange={(e) =>
+                      setBug({ ...bug, affectedVersion: e.target.value })
                     }
                   />
                 </div>
-                <button className="btn secondary" onClick={saveBug}>
-                  <Save size={15} />
-                  Lưu thông tin lỗi
-                </button>
+                {canEditTask && (
+                  <button className="btn secondary" onClick={saveBug}>
+                    <Save size={15} />
+                    Lưu thông tin lỗi
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1506,7 +1540,7 @@ function TaskDetails({
                 ))}
                 {!taskLabels.length && <p>Chưa có nhãn</p>}
               </div>
-              <details className="participant-picker">
+              {canEditTask && <details className="participant-picker">
                 <summary>Chỉnh nhãn</summary>
                 {labels.map((label) => (
                   <label key={label.id}>
@@ -1522,7 +1556,7 @@ function TaskDetails({
                     {label.name}
                   </label>
                 ))}
-              </details>
+              </details>}
             </div>
             <div className="task-participants">
               <span>Liên kết ({taskLinks.length})</span>
@@ -1533,18 +1567,18 @@ function TaskDetails({
                       {link.linkType}: {link.targetTaskCode} ·{" "}
                       {link.targetTaskTitle}
                     </span>
-                    <button
+                    {canEditTask && <button
                       className="icon-btn compact-icon"
                       aria-label={`Gỡ liên kết ${link.targetTaskCode}`}
                       onClick={() => removeLink(link.id)}
                     >
                       <X size={14} />
-                    </button>
+                    </button>}
                   </div>
                 ))}
                 {!taskLinks.length && <p>Chưa có liên kết</p>}
               </div>
-              <div className="task-link-form">
+              {canEditTask && <div className="task-link-form">
                 <select
                   aria-label="Loại liên kết"
                   value={linkType}
@@ -1575,7 +1609,7 @@ function TaskDetails({
                 >
                   <Plus size={14} /> Liên kết
                 </button>
-              </div>
+              </div>}
             </div>
             {collaboration && (
               <div className="task-participants">
@@ -1642,34 +1676,42 @@ function TaskDetails({
             )}
             <div>
               <span>Trạng thái</span>
-              <select
-                className="status-select"
-                value={task.status}
-                onChange={(event) => update(task, event.target.value)}
-              >
-                {Object.entries(STATUS).map(([value, [label]]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              {canEditTask ? (
+                <select
+                  className="status-select"
+                  value={task.status}
+                  onChange={(event) => update(task, event.target.value)}
+                >
+                  {Object.entries(STATUS).map(([value, [label]]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>{STATUS[task.status]?.[0] || task.status}</p>
+              )}
             </div>
             <div>
               <span>Sprint</span>
-              <select
-                className="status-select"
-                value={task.sprintId || ""}
-                onChange={(event) =>
-                  update(task, task.status, event.target.value || null)
-                }
-              >
-                <option value="">Backlog</option>
-                {sprints.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+              {canEditTask ? (
+                <select
+                  className="status-select"
+                  value={task.sprintId || ""}
+                  onChange={(event) =>
+                    update(task, task.status, event.target.value || null)
+                  }
+                >
+                  <option value="">Backlog</option>
+                  {sprints.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>{sprints.find((item) => item.id === task.sprintId)?.name || "Backlog"}</p>
+              )}
             </div>
             <div>
               <span>Ưu tiên</span>
@@ -1894,28 +1936,36 @@ function SprintPage({ token, project, tasks, sprints, reload, isAdmin }) {
         {tasks.map((task) => (
           <label key={task.id}>
             {task.taskCode} · {task.title}
-            <select
-              value={task.sprintId || ""}
-              onChange={async (e) => {
-                if (e.target.value && !task.estimatedHours && task.storyPoints == null) {
-                  setError(`Cảnh báo: ${task.taskCode} chưa có giờ ước lượng hoặc Story Point.`);
-                }
-                await viraApi.assignSprint(
-                  token,
-                  project.id,
-                  task.id,
-                  e.target.value || null,
-                );
-                reload();
-              }}
-            >
-              <option value="">Backlog</option>
-              {sprints.map((sprint) => (
-                <option key={sprint.id} value={sprint.id}>
-                  {sprint.name}
-                </option>
-              ))}
-            </select>
+            {isAdmin ? (
+              <select
+                value={task.sprintId || ""}
+                onChange={async (e) => {
+                  if (e.target.value && !task.estimatedHours && task.storyPoints == null) {
+                    setError(`Cảnh báo: ${task.taskCode} chưa có giờ ước lượng hoặc Story Point.`);
+                  }
+                  try {
+                    await viraApi.assignSprint(
+                      token,
+                      project.id,
+                      task.id,
+                      e.target.value || null,
+                    );
+                    reload();
+                  } catch (err) {
+                    setError(errorText(err));
+                  }
+                }}
+              >
+                <option value="">Backlog</option>
+                {sprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>{sprints.find((sprint) => sprint.id === task.sprintId)?.name || "Backlog"}</span>
+            )}
           </label>
         ))}
       </div>
@@ -3334,6 +3384,8 @@ function App() {
         localStorage.removeItem("vira.workspaceId");
         localStorage.removeItem("vira.projectId");
         setSession(null);
+        setSelected(null);
+        setTasks([]);
       }
     } finally {
       setLoading(false);
@@ -3350,12 +3402,19 @@ function App() {
       setSession(null);
       setWorkspace(null);
       setProject(null);
+      setSelected(null);
+      setTasks([]);
     };
     window.addEventListener("vira:unauthorized", handleUnauthorized);
     return () => window.removeEventListener("vira:unauthorized", handleUnauthorized);
   }, []);
   const authenticated = (next) => {
     localStorage.setItem("vira.session", JSON.stringify(next));
+    setSelected(null);
+    setTasks([]);
+    setWorkspace(null);
+    setProject(null);
+    setPage("Tổng quan");
     setSession(next);
   };
   const ready = async (newWorkspace, newProject) => {
@@ -3510,6 +3569,8 @@ function App() {
           setSession(null);
           setWorkspace(null);
           setProject(null);
+          setSelected(null);
+          setTasks([]);
         }}
       />
     );
@@ -3579,6 +3640,7 @@ function App() {
         token={session.accessToken}
         projectId={project.id}
         isAdmin={isAdmin}
+        currentUserId={session.user.id}
       />
     ) : page === "Backlog" ? (
       <Backlog
@@ -3588,6 +3650,8 @@ function App() {
         move={moveTask}
         token={session.accessToken}
         projectId={project.id}
+        isAdmin={isAdmin}
+        currentUserId={session.user.id}
       />
     ) : page === "Sprint" ? (
       <SprintPage
@@ -3701,6 +3765,11 @@ function App() {
                 localStorage.removeItem("vira.session");
                 localStorage.removeItem("vira.workspaceId");
                 localStorage.removeItem("vira.projectId");
+                setSelected(null);
+                setTasks([]);
+                setWorkspace(null);
+                setProject(null);
+                setPage("Tổng quan");
                 setSession(null);
               }}
               aria-label="Đăng xuất"
@@ -3790,8 +3859,16 @@ function App() {
         update={update}
         token={session.accessToken}
         projectId={project.id}
+        currentUserId={session.user.id}
+        isAdmin={isAdmin}
         sprints={sprints}
         tasks={tasks}
+        refreshTask={async (taskId) => {
+          const freshTasks = await viraApi.tasks(session.accessToken, project.id);
+          setTasks(freshTasks);
+          const freshTask = freshTasks.find((item) => item.id === taskId);
+          if (freshTask) setSelected(freshTask);
+        }}
       />
       {creating && (
         <TaskForm
