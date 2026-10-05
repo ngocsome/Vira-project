@@ -13,6 +13,10 @@ import vn.vira.sprint.api.SprintResponse;
 import vn.vira.sprint.domain.Sprint;
 import vn.vira.sprint.domain.SprintRepository;
 import vn.vira.sprint.domain.SprintStatus;
+import vn.vira.sprint.api.CompleteSprintRequest;
+import vn.vira.task.domain.Task;
+import vn.vira.task.domain.TaskRepository;
+import vn.vira.task.domain.TaskStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,7 @@ public class SprintService {
     private final SprintRepository sprintRepository;
     private final ProjectService projectService;
     private final SprintMapper sprintMapper;
+    private final TaskRepository taskRepository;
 
     @Transactional
     public SprintResponse create(Long projectId, CreateSprintRequest request) {
@@ -70,7 +75,7 @@ public class SprintService {
     }
 
     @Transactional
-    public SprintResponse complete(Long projectId, Long sprintId) {
+    public SprintResponse complete(Long projectId, Long sprintId, CompleteSprintRequest request) {
         projectService.requireAdmin(projectId);
         Sprint sprint = find(projectId, sprintId);
 
@@ -78,6 +83,15 @@ public class SprintService {
             throw new BusinessException("Chỉ có thể kết thúc Sprint đang diễn ra");
         }
 
+        Sprint target = null;
+        if (request != null && request.targetSprintId() != null) {
+            if (request.targetSprintId().equals(sprintId)) throw new BusinessException("Sprint đích phải khác Sprint đang kết thúc");
+            target = find(projectId, request.targetSprintId());
+            if (target.getStatus() == SprintStatus.COMPLETED) throw new BusinessException("Không thể chuyển công việc vào Sprint đã hoàn thành");
+        }
+        for (Task task : taskRepository.findByProjectIdAndSprintIdAndStatusNotAndDeletedAtIsNull(projectId, sprintId, TaskStatus.DONE)) {
+            task.assignToSprint(target);
+        }
         sprint.setStatus(SprintStatus.COMPLETED);
         return sprintMapper.toResponse(sprint);
     }

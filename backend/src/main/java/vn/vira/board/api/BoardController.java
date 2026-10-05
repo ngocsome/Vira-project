@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 import vn.vira.board.application.BoardService;
@@ -30,5 +32,25 @@ public class BoardController {
     public ApiResponse<BoardColumnResponse> updateColumn(@PathVariable Long projectId, @PathVariable Long columnId, @Valid @RequestBody UpdateBoardColumnRequest request) {
         projectService.requireManager(projectId);
         return ApiResponse.ok(boardService.updateColumn(projectId, columnId, request), "Cập nhật cột bảng thành công");
+    }
+
+    @PostMapping("/columns")
+    public ApiResponse<BoardColumnResponse> createColumn(@PathVariable Long projectId, @Valid @RequestBody CreateBoardColumnRequest request) {
+        projectService.requireManager(projectId);
+        return ApiResponse.ok(boardService.createColumn(projectId, request), "Tạo cột bảng thành công");
+    }
+
+    @PatchMapping("/columns/order")
+    public ApiResponse<Void> reorderColumns(@PathVariable Long projectId, @Valid @RequestBody ReorderBoardColumnsRequest request) {
+        projectService.requireManager(projectId);
+        boardService.reorderColumns(projectId, request);
+        return ApiResponse.ok(null, "Sắp xếp cột bảng thành công");
+    }
+
+    @DeleteMapping("/columns/{columnId}")
+    public ApiResponse<Void> deleteColumn(@PathVariable Long projectId, @PathVariable Long columnId) {
+        projectService.requireManager(projectId);
+        boardService.deleteColumn(projectId, columnId);
+        return ApiResponse.ok(null, "Xóa cột bảng thành công");
     }
 }

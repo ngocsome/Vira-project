@@ -42,7 +42,7 @@ jobs:
       # 3. Prepare Deploy Artifacts
       - name: Package Artifacts
         run: |
-          tar -czf dist.tar.gz dist
+          tar -czf dist.tar.gz dist docker-compose.prod.yml nginx.conf
           tar -czf backend-deploy.tar.gz backend/Dockerfile backend/target/vira-api-0.1.0.jar
 
       # 4. Deploy to AWS EC2 via SSH

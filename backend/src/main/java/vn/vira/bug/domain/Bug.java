@@ -60,7 +60,6 @@ public class Bug {
             String affectedVersion
     ) {
         this.task = task;
-        this.taskId = task.getId();
         this.environment = environment;
         this.severity = severity;
         this.reproductionSteps = reproductionSteps;

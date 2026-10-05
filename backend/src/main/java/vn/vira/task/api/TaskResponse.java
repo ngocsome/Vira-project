@@ -18,6 +18,7 @@ public record TaskResponse(
         Long sprintId,
         Long parentTaskId,
         Long reporterId,
+        java.util.List<Long> assigneeIds,
         LocalDate dueDate,
         BigDecimal estimatedHours,
         Integer storyPoints,

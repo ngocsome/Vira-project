@@ -48,4 +48,8 @@ public class BoardColumn extends BaseEntity {
         this.name = newName;
         this.wipLimit = newWipLimit;
     }
+
+    public void setPosition(int newPosition) {
+        this.position = newPosition;
+    }
 }

@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface BoardColumnRepository extends JpaRepository<BoardColumn, Long> {
 
     List<BoardColumn> findByBoardIdOrderByPositionAsc(Long boardId);
+
+    boolean existsByBoardIdAndTaskStatus(Long boardId, vn.vira.task.domain.TaskStatus taskStatus);
 }

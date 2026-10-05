@@ -25,6 +25,8 @@ import vn.vira.audit.application.ActivityLogService;
 
 import vn.vira.workspace.domain.WorkspaceMemberRepository;
 import vn.vira.workspace.domain.WorkspaceRole;
+import vn.vira.task.domain.ProjectTaskCounter;
+import vn.vira.task.domain.ProjectTaskCounterRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +41,7 @@ public class ProjectService {
     private final BoardService boardService;
     private final ActivityLogService activityLogs;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final ProjectTaskCounterRepository taskCounterRepository;
 
     @Transactional
     public ProjectResponse create(Long workspaceId, CreateProjectRequest request) {
@@ -69,6 +72,7 @@ public class ProjectService {
                 request.targetEndDate()
         ));
 
+        taskCounterRepository.save(new ProjectTaskCounter(project.getId()));
         projectMemberRepository.save(new ProjectMember(project, owner, ProjectRole.OWNER));
         boardService.createDefaultBoard(project);
         activityLogs.recordProject(project, "PROJECT_CREATED", "Tạo dự án");

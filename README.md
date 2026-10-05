@@ -16,7 +16,7 @@ Vira là ứng dụng quản lý công việc theo **workspace → project → t
 | --- | --- | --- |
 | Frontend | React 19, Vite, Lucide | SPA tại cổng 5173 |
 | Backend | Java 21, Spring Boot 3.5, Security, JPA | REST API tại cổng 8080 |
-| Database | MySQL 8.4 + Flyway | Schema migration `V1`–`V6` |
+| Database | MySQL 8.4 + Flyway | Schema migration `V1`–`V13` |
 | Email local | Mailpit | Nhận email reset tại cổng 8025 |
 | Upload | Docker volume `backend/uploads` | Lưu tệp đính kèm local |
 
@@ -248,7 +248,7 @@ npm run build
 
 ## Giới hạn hiện tại
 
-- Notification là in-app; chưa có WebSocket/SSE hoặc push realtime.
+- Notification là in-app và giao diện tự làm mới mỗi 30 giây; production có thể bổ sung WebSocket/SSE nếu cần cập nhật tức thời hơn.
 - Docker dùng Mailpit cho email local; production cần SMTP thật.
 - Backend hiện có report `overview`; biểu đồ chuyên sâu hoàn toàn server-side cần endpoint riêng.
 - Upload dùng filesystem local; production nên dùng object storage, antivirus scanning và backup.

@@ -35,6 +35,9 @@ management:
         enabled: true
 
 app:
+  notifications:
+    deadline-cron: ${DEADLINE_REMINDER_CRON:0 0 9 * * *}
+    time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   mail:
     reset-url: ${RESET_PASSWORD_URL:http://localhost:5173/reset-password}
   security:

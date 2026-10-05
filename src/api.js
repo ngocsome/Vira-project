@@ -286,11 +286,18 @@ export const viraApi = {
       method: "PATCH",
       token,
     }),
-  completeSprint: (token, projectId, sprintId) =>
+  completeSprint: (token, projectId, sprintId, targetSprintId = null) =>
     request(`/projects/${projectId}/sprints/${sprintId}/complete`, {
       method: "PATCH",
       token,
+      body: { targetSprintId },
     }),
+  createBoardColumn: (token, projectId, column) => request(`/projects/${projectId}/board/columns`, { method: "POST", token, body: column }),
+  reorderBoardColumns: (token, projectId, columnIds) => request(`/projects/${projectId}/board/columns/order`, { method: "PATCH", token, body: { columnIds } }),
+  deleteBoardColumn: (token, projectId, columnId) => request(`/projects/${projectId}/board/columns/${columnId}`, { method: "DELETE", token }),
+  teams: (token, projectId) => request(`/projects/${projectId}/teams`, { token }),
+  createTeam: (token, projectId, team) => request(`/projects/${projectId}/teams`, { method: "POST", token, body: team }),
+  updateTeamMembers: (token, projectId, teamId, userIds) => request(`/projects/${projectId}/teams/${teamId}/members`, { method: "PUT", token, body: { userIds } }),
   assignSprint: (token, projectId, taskId, sprintId) =>
     request(`/projects/${projectId}/tasks/${taskId}/sprint`, {
       method: "PATCH",

@@ -11,4 +11,6 @@ public interface SprintRepository extends JpaRepository<Sprint, Long> {
     Optional<Sprint> findByProjectIdAndStatus(Long projectId, SprintStatus status);
 
     Optional<Sprint> findByIdAndProjectId(Long id, Long projectId);
+
+    List<Sprint> findByStatusAndEndDateBetween(SprintStatus status, java.time.LocalDate from, java.time.LocalDate to);
 }

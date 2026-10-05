@@ -40,7 +40,7 @@ jobs:
           done
           exit 1
       - name: Frontend E2E
-        run: npm run test:e2e -- --project=chromium
+        run: npm run test:e2e -- --project=chromium --project=mobile-chrome
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
