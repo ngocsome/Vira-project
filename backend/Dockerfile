@@ -2,7 +2,10 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-RUN addgroup -S vira && adduser -S vira -G vira
+RUN addgroup -S vira \
+    && adduser -S vira -G vira \
+    && mkdir -p /app/uploads \
+    && chown vira:vira /app/uploads
 
 COPY target/vira-api-0.1.0.jar app.jar
 
