@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: '20'
           cache: npm
+      - name: Make Maven Wrapper executable
+        run: chmod +x backend/mvnw
       - name: Backend tests
         working-directory: backend
         run: ./mvnw test
