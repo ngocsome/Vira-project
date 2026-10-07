@@ -45,6 +45,8 @@ jobs:
             sleep 2
           done
           exit 1
+      - name: Seed E2E demo accounts and project
+        run: node scripts/seed-demo-data.mjs
       - name: Frontend E2E
         run: npm run test:e2e -- --project=chromium --project=mobile-chrome
       - name: Upload Playwright report
