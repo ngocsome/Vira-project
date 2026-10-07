@@ -37,6 +37,8 @@ jobs:
           sudo chown -R 100:101 backend/uploads
       - name: Start E2E services
         working-directory: backend
+        env:
+          LOGIN_RATE_LIMIT_MAX_REQUESTS: 100
         run: docker compose up -d --build
       - name: Wait for API readiness
         run: |

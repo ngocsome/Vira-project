@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,6 +24,9 @@ public class AuthController {
     private final vn.vira.auth.application.PasswordResetService passwordResetService;
     private final RequestRateLimiter rateLimiter;
 
+    @Value("${LOGIN_RATE_LIMIT_MAX_REQUESTS:8}")
+    private int loginRateLimitMaxRequests;
+
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -31,7 +35,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        rateLimiter.check("login", clientIp(httpRequest), 8, Duration.ofMinutes(1));
+        rateLimiter.check("login", clientIp(httpRequest), loginRateLimitMaxRequests, Duration.ofMinutes(1));
         return ApiResponse.ok(authService.login(request), "Đăng nhập thành công");
     }
 
