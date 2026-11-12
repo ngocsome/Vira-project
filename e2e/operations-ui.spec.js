@@ -23,6 +23,8 @@ test.afterEach(async ({ request }) => {
 });
 
 test("Owner có thể tạo/di chuyển task, lập sprint và mời thành viên trên UI", async ({ page, request }) => {
+  // This end-to-end flow regularly takes 20-30s, too close to the 30s default.
+  test.setTimeout(60_000);
   const tag = `${Date.now()}${Math.floor(Math.random() * 10000)}`;
   const owner = await apiData(request, "POST", "/auth/register", null, {
     fullName: "Operations Owner", email: `operations-${tag}@vira.local`, password: "OperationsPass@12345",

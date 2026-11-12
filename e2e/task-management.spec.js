@@ -166,6 +166,19 @@ test.describe("Task & Subtask API", () => {
     expect(activeAfterRestore.map((item) => item.id)).toEqual(expect.arrayContaining([parent.id, child.id]));
   });
 
+  test("should_return_400_when_moving_parent_to_done_with_open_subtasks", async ({ request }) => {
+    const ctx = await seedProject(request);
+    const token = ctx.owner.accessToken;
+    const parent = await createTask(request, ctx, token, { title: "Unfinished parent" });
+    await createTask(request, ctx, token, { title: "Open child", taskType: "SUBTASK", parentTaskId: parent.id });
+
+    const result = await call(request, "PATCH", `/projects/${ctx.project.id}/tasks/${parent.id}/move`, token, {
+      status: "DONE", position: 0, version: parent.version,
+    });
+
+    expect(result.status).toBe(400);
+  });
+
   test("should_return_400_when_restoring_subtask_while_parent_deleted", async ({ request }) => {
     const ctx = await seedProject(request);
     const token = ctx.owner.accessToken;
@@ -266,4 +279,31 @@ test("should_group_subtasks_under_parent_on_board_and_backlog", async ({ page, r
   await expect(page.locator(".backlog-row.subtask-row")).toHaveCount(2);
   await expect(parentRow.locator("xpath=following-sibling::*[1]")).toContainText(firstSubtask.title);
   await expect(parentRow.locator("xpath=following-sibling::*[2]")).toContainText(secondSubtask.title);
+});
+
+test("should_change_subtask_status_when_dragging_it_to_another_board_column", async ({ page, request }) => {
+  test.skip(test.info().project.name === "mobile-chrome", "HTML5 drag and drop is desktop only.");
+  const ctx = await seedProject(request);
+  const token = ctx.owner.accessToken;
+  const parentTitle = `Drag parent ${ctx.tag}`;
+  const parent = await createTask(request, ctx, token, { title: parentTitle });
+  const subtask = await createTask(request, ctx, token, { title: `Drag child ${ctx.tag}`, taskType: "SUBTASK", parentTaskId: parent.id });
+  await page.addInitScript((state) => {
+    localStorage.setItem("vira.session", JSON.stringify(state.session));
+    localStorage.setItem("vira.workspaceId", String(state.workspaceId));
+    localStorage.setItem("vira.projectId", String(state.projectId));
+  }, { session: ctx.owner, workspaceId: ctx.workspace.id, projectId: ctx.project.id });
+  await page.goto("/");
+  await page.locator(".sidebar").getByRole("button", { name: /Bảng công việc/ }).click();
+  const parentCard = page.locator(".kanban-col .task-card").filter({ hasText: parentTitle });
+  await parentCard.getByRole("button", { name: "0/1 việc con" }).click();
+  const chip = page.getByTestId(`subtask-chip-${subtask.taskCode}`);
+  const inProgressColumn = page.locator(".kanban-col").filter({ hasText: "Đang thực hiện" });
+
+  await chip.dragTo(inProgressColumn.locator(".task-list"));
+
+  await expect(chip.locator(".subtask-status")).toHaveText("Đang thực hiện");
+  await expect(page.locator(".kanban-col").filter({ hasText: "Cần thực hiện" }).locator(".task-card")).toHaveCount(1);
+  const tasks = await expectData(request, "GET", `/projects/${ctx.project.id}/tasks`, token);
+  expect(tasks.find((item) => item.id === subtask.id).status).toBe("IN_PROGRESS");
 });

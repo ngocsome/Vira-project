@@ -47,6 +47,12 @@ Total time: 8 minutes
 - `.gitignore`: thêm `.claude/`.
 - E2E: `should_group_subtasks_under_parent_on_board_and_backlog`.
 
+### T7 (bổ sung): Kéo thả subtask trên Board — Completed
+- `CardSubtasks`: từng việc con trong thẻ cha có thể kéo sang cột khác để đổi trạng thái (chặn bubbling để không kéo nhầm thẻ cha); chỉ kéo được khi có quyền sửa subtask.
+- Backend: `move` áp dụng cùng quy tắc với `changeStatus` — không cho đưa task cha sang DONE khi còn việc con chưa xong (`assertSubtasksDoneBeforeCompleting`).
+- E2E: `should_change_subtask_status_when_dragging_it_to_another_board_column`, `should_return_400_when_moving_parent_to_done_with_open_subtasks`.
+- `operations-ui.spec.js`: tăng timeout lên 60s (luồng mất 20–30s, hay flaky ở ngưỡng 30s).
+
 ## Known Limitations
-- Trên Board, subtask không kéo thả riêng được (đổi trạng thái subtask qua chi tiết công việc).
+- Kéo thả HTML5 không hoạt động trên thiết bị cảm ứng (áp dụng cho cả Board hiện tại); trên mobile đổi trạng thái qua chi tiết công việc.
 - `TaskModal` (component cũ, không còn dùng) vẫn còn trong `main.jsx` — ngoài phạm vi.

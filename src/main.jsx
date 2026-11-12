@@ -163,7 +163,7 @@ function ParentMarker({ parent }) {
     </span>
   );
 }
-function CardSubtasks({ subtasks, open }) {
+function CardSubtasks({ subtasks, open, subtaskDrag }) {
   const [expanded, setExpanded] = useState(false);
   const doneCount = subtasks.filter((item) => item.status === "DONE").length;
   const stop = (event) => event.stopPropagation();
@@ -184,7 +184,18 @@ function CardSubtasks({ subtasks, open }) {
             <button
               type="button"
               key={item.id}
-              className="card-subtask"
+              className={`card-subtask ${subtaskDrag?.draggingId === item.id ? "dragging" : ""}`}
+              data-testid={`subtask-chip-${item.taskCode}`}
+              draggable={Boolean(subtaskDrag?.canDrag(item))}
+              onDragStart={(event) => {
+                // Keep the parent card's own drag handler from taking over.
+                event.stopPropagation();
+                subtaskDrag.start(event, item);
+              }}
+              onDragEnd={(event) => {
+                event.stopPropagation();
+                subtaskDrag.end();
+              }}
               onClick={() => open(item)}
             >
               <span className="card-subtask-title">
@@ -203,6 +214,7 @@ function TaskCard({
   open,
   subtasks = [],
   parent = null,
+  subtaskDrag = null,
   draggable = false,
   isDragging = false,
   isDragOver = false,
@@ -270,7 +282,9 @@ function TaskCard({
         </span>
         <span className="task-status-inline">{status}</span>
       </div>
-      {subtasks.length > 0 && <CardSubtasks subtasks={subtasks} open={open} />}
+      {subtasks.length > 0 && (
+        <CardSubtasks subtasks={subtasks} open={open} subtaskDrag={subtaskDrag} />
+      )}
     </div>
   );
 }
@@ -489,6 +503,14 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUs
       }));
   const { roots, subtasksByParent } = groupSubtasks(tasks);
   const tasksById = indexTasksById(tasks);
+  // Subtasks stay nested in their parent card but can be dragged on their own
+  // into any column to change their status.
+  const subtaskDrag = {
+    draggingId: draggedTaskId,
+    canDrag: (subtask) => canEditTaskAs(subtask, currentUserId, isAdmin),
+    start: handleDragStart,
+    end: handleDragEnd,
+  };
 
   return (
     <section className="board-wrap">
@@ -569,6 +591,7 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUs
                     open={open}
                     subtasks={subtasksByParent.get(task.id)}
                     parent={tasksById.get(task.parentTaskId)}
+                    subtaskDrag={subtaskDrag}
                     draggable={canEditTaskAs(task, currentUserId, isAdmin)}
                     isDragging={draggedTaskId === task.id}
                     isDragOver={dragOverTaskId === task.id}

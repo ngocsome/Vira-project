@@ -37,6 +37,10 @@ Total time: 16 minutes
 - Backlog: subtask hiển thị thụt lề ngay dưới task cha; subtask "mồ côi" do bộ lọc hiển thị kèm "↳ mã cha".
 - Regression sau bổ sung: 14/14 test task-management + 17/17 test auth/backlog/operations/platform/roles pass.
 
+## Bổ sung: kéo thả subtask trên Board
+- Việc con trong thẻ cha kéo được sang cột khác để đổi trạng thái; thẻ cha không thể kéo sang DONE khi còn việc con mở (400).
+- Test: 16/16 task-management pass; backlog/roles/operations-ui pass khi chạy lại (lần đầu timeout do API vừa khởi động lại, máy chậm hơn ~2x).
+
 ## Test Coverage
 - **Mới:** 12 test (10 API, 2 UI × 2 thiết bị) — tất cả pass.
   - Happy path: update, tạo subtask, editor cha xóa subtask, cascade delete/restore, luồng UI, gom subtask trên Board/Backlog.
@@ -48,7 +52,7 @@ Total time: 16 minutes
 - Skipped (không có báo cáo scanner). Không thêm secret; đầu vào được validate bằng Bean Validation.
 
 ## Warnings
-- `operations-ui.spec.js` sát ngưỡng timeout 30s → dễ flaky; nên tăng timeout cho test này.
+- `operations-ui.spec.js` sát ngưỡng timeout 30s → đã tăng lên 60s.
 
 ## Final Checklist
 - [x] Code review: GREEN

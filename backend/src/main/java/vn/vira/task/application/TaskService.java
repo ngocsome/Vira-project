@@ -181,10 +181,7 @@ public class TaskService {
             throw new ObjectOptimisticLockingFailureException(Task.class, taskId);
         }
 
-        if (request.status() == TaskStatus.DONE
-                && taskRepository.existsByParentTaskIdAndStatusNotAndDeletedAtIsNull(taskId, TaskStatus.DONE)) {
-            throw new BusinessException("Không thể hoàn thành công việc cha khi còn công việc con chưa hoàn thành");
-        }
+        assertSubtasksDoneBeforeCompleting(taskId, request.status());
 
         task.changeStatus(request.status());
         statusHistory.save(new TaskStatusHistory(task, request.status()));
@@ -199,6 +196,7 @@ public class TaskService {
         Task task = requireTask(projectId, taskId);
         taskAuthorizationService.requireTaskEditor(task);
         assertVersion(task, request.version());
+        assertSubtasksDoneBeforeCompleting(taskId, request.status());
         reorder(projectId, task, request.status(), request.position());
         statusHistory.save(new TaskStatusHistory(task, request.status()));
         activityLogs.record(task, "TASK_MOVED", "Di chuyển đến " + request.status());
@@ -265,6 +263,13 @@ public class TaskService {
             throw new BusinessException("Không thể tạo công việc con cho một công việc con");
         }
         return parent;
+    }
+
+    private void assertSubtasksDoneBeforeCompleting(Long taskId, TaskStatus targetStatus) {
+        if (targetStatus == TaskStatus.DONE
+                && taskRepository.existsByParentTaskIdAndStatusNotAndDeletedAtIsNull(taskId, TaskStatus.DONE)) {
+            throw new BusinessException("Không thể hoàn thành công việc cha khi còn công việc con chưa hoàn thành");
+        }
     }
 
     private void assertDueDateNotPast(LocalDate dueDate) {

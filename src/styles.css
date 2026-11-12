@@ -3136,3 +3136,10 @@ main {
     padding-left: 30px;
   }
 }
+.card-subtask[draggable="true"] {
+  cursor: grab;
+}
+.card-subtask.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
