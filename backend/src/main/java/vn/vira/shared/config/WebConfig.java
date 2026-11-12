@@ -19,7 +19,7 @@ public class WebConfig {
         configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-Match"));
-        configuration.setExposedHeaders(List.of("ETag"));
+        configuration.setExposedHeaders(List.of("ETag", "Content-Disposition"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

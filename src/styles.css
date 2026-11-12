@@ -1802,6 +1802,43 @@ body {
   font-size: 11px;
   font-weight: 700;
 }
+.saved-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+}
+.saved-filter-chip .filter-chip {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.saved-filter-chip .filter-chip[aria-pressed="true"] {
+  color: #fff;
+  background: #2563eb;
+}
+.filter-chip-delete {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-left: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  background: transparent;
+  cursor: pointer;
+}
+.filter-chip-delete:hover {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+.filter-chip-delete:focus-visible,
+.saved-filter-chip .filter-chip:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: -2px;
+}
 .saved-filter-bar input {
   min-width: 110px;
   flex: 1 1 130px;

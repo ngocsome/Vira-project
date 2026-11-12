@@ -1,0 +1,170 @@
+{
+  "input": "C:\\Users\\ADMIN\\OneDrive\\Desktop\\Vira-project\\Bao-cao-ca-nhan-Vira-hoan-chinh.docx",
+  "fonts_by_char_count": {
+    "Times New Roman": 20654
+  },
+  "direct_run_formatting_runs": 343,
+  "direct_paragraph_formatting_paragraphs": 302,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 1,
+      "text": "B\u00c0I KI\u1ec2M TRA TH\u01af\u1edcNG XUY\u00caN 2",
+      "style": "Normal"
+    },
+    {
+      "para_index": 2,
+      "text": "\u0110\u1ea2M B\u1ea2O CH\u1ea4T L\u01af\u1ee2NG PH\u1ea6N M\u1ec0M",
+      "style": "Normal"
+    },
+    {
+      "para_index": 3,
+      "text": "PH\u1ea6N II. B\u00c1O C\u00c1O C\u00c1 NH\u00c2N",
+      "style": "Normal"
+    },
+    {
+      "para_index": 4,
+      "text": "\u0110\u1ec0 T\u00c0I",
+      "style": "Normal"
+    },
+    {
+      "para_index": 5,
+      "text": "\u0110\u1ea3m b\u1ea3o ch\u1ea5t l\u01b0\u1ee3ng cho d\u1ef1 \u00e1n \u1ee9ng d\u1ee5ng web qu\u1ea3n l\u00fd d\u1ef1 \u00e1n Vira",
+      "style": "Normal"
+    },
+    {
+      "para_index": 6,
+      "text": "B\u00c1O C\u00c1O C\u00c1 NH\u00c2N",
+      "style": "Normal"
+    },
+    {
+      "para_index": 13,
+      "text": "L\u1edcI M\u1ede \u0110\u1ea6U",
+      "style": "Normal"
+    },
+    {
+      "para_index": 18,
+      "text": "DANH M\u1ee4C T\u1eea VI\u1ebeT T\u1eaeT",
+      "style": "Normal"
+    },
+    {
+      "para_index": 26,
+      "text": "M\u1ee4C L\u1ee4C",
+      "style": "Normal"
+    },
+    {
+      "para_index": 27,
+      "text": "L\u1eddi m\u1edf \u0111\u1ea7u\t2",
+      "style": "Normal"
+    },
+    {
+      "para_index": 28,
+      "text": "Danh m\u1ee5c t\u1eeb vi\u1ebft t\u1eaft\t2",
+      "style": "Normal"
+    },
+    {
+      "para_index": 29,
+      "text": "1. L\u1ef1a ch\u1ecdn m\u00f4 h\u00ecnh ph\u00e1t tri\u1ec3n v\u00e0 ti\u00eau chu\u1ea9n ch\u1ea5t l\u01b0\u1ee3ng\t4",
+      "style": "Normal"
+    },
+    {
+      "para_index": 34,
+      "text": "2. Thi\u1ebft l\u1eadp b\u1ed9 ti\u00eau chu\u1ea9n t\u00e0i li\u1ec7u SQA\t7",
+      "style": "Normal"
+    },
+    {
+      "para_index": 43,
+      "text": "3. Quy tr\u00ecnh SQA ph\u1ee5c v\u1ee5 r\u00e0 so\u00e1t m\u00e3 ngu\u1ed3n\t10",
+      "style": "Normal"
+    },
+    {
+      "para_index": 54,
+      "text": "4. Checklist r\u00e0 so\u00e1t m\u00e3 ngu\u1ed3n v\u00e0 k\u1ebft qu\u1ea3 \u00e1p d\u1ee5ng\t15",
+      "style": "Normal"
+    },
+    {
+      "para_index": 63,
+      "text": "K\u1ebft lu\u1eadn\t23",
+      "style": "Normal"
+    },
+    {
+      "para_index": 64,
+      "text": "T\u00e0i li\u1ec7u tham kh\u1ea3o\t24",
+      "style": "Normal"
+    },
+    {
+      "para_index": 167,
+      "text": "B\u1ea3ng 4.1. Checklist coding standards v\u00e0 kh\u1ea3 n\u0103ng b\u1ea3o tr\u00ec",
+      "style": "Normal"
+    },
+    {
+      "para_index": 169,
+      "text": "B\u1ea3ng 4.2. Checklist ph\u00e2n quy\u1ec1n v\u00e0 b\u1ea3o m\u1eadt",
+      "style": "Normal"
+    },
+    {
+      "para_index": 171,
+      "text": "B\u1ea3ng 4.3. Checklist t\u00ednh \u0111\u00fang \u0111\u1eafn v\u00e0 to\u00e0n v\u1eb9n d\u1eef li\u1ec7u",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "B\u00c0I KI\u1ec2M TRA TH\u01af\u1edcNG XUY\u00caN 2",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "\u0110\u1ea2M B\u1ea2O CH\u1ea4T L\u01af\u1ee2NG PH\u1ea6N M\u1ec0M",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "PH\u1ea6N II. B\u00c1O C\u00c1O C\u00c1 NH\u00c2N",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "text": "\u0110\u1ec0 T\u00c0I",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "text": "\u0110\u1ea3m b\u1ea3o ch\u1ea5t l\u01b0\u1ee3ng cho d\u1ef1 \u00e1n \u1ee9ng d\u1ee5ng web qu\u1ea3n l\u00fd d\u1ef1 \u00e1n Vira",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "B\u00c0I KI\u1ec2M TRA TH\u01af\u1edcNG XUY\u00caN 2",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "\u0110\u1ea2M B\u1ea2O CH\u1ea4T L\u01af\u1ee2NG PH\u1ea6N M\u1ec0M",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "PH\u1ea6N II. B\u00c1O C\u00c1O C\u00c1 NH\u00c2N",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "run_text": "\u0110\u1ec0 T\u00c0I",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "run_text": "\u0110\u1ea3m b\u1ea3o ch\u1ea5t l\u01b0\u1ee3ng cho d\u1ef1 \u00e1n \u1ee9ng d\u1ee5ng web qu\u1ea3n l\u00fd d\u1ef1 \u00e1n Vira",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

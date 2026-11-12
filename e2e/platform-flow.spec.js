@@ -54,6 +54,19 @@ test("quy trﾃｬnh workspace, d盻ｱ ﾃ｡n, phﾃ｢n quy盻］, task vﾃ cﾃ｡c module nghi盻
   expect((await data(request, "GET", "/users/me", refreshedOwner)).email).toBe(owner.email);
   const updatedProfile = await data(request, "PUT", "/users/me", owner, { fullName: "Flow Owner Updated", avatarUrl: null });
   expect(updatedProfile.fullName).toBe("Flow Owner Updated");
+  const wrongCurrentPassword = await request.put(`${api}/users/me/password`, {
+    headers: owner.headers,
+    data: { currentPassword: "WrongPass@12345", newPassword: "NextFlowPass@12345" },
+  });
+  expect(wrongCurrentPassword.status()).toBe(401);
+  const unchangedPassword = await request.put(`${api}/users/me/password`, {
+    headers: owner.headers,
+    data: { currentPassword: "FlowPass@12345", newPassword: "FlowPass@12345" },
+  });
+  expect(unchangedPassword.status()).toBe(400);
+  await data(request, "PUT", "/users/me/password", owner, {
+    currentPassword: "FlowPass@12345", newPassword: "NextFlowPass@12345",
+  });
 
   const workspace = await data(request, "POST", "/workspaces", owner, { name: `Flow ${tag}`, description: "" }, 201);
   workspaceCleanup = { id: workspace.id, headers: owner.headers };
@@ -91,6 +104,24 @@ test("quy trﾃｬnh workspace, d盻ｱ ﾃ｡n, phﾃ｢n quy盻］, task vﾃ cﾃ｡c module nghi盻
   const createdTask = await data(request, "POST", `/projects/${project.id}/tasks`, member, {
     title: "Parent feature", description: "Lifecycle fixture", taskType: "STORY", priority: "HIGH", estimatedHours: 3, storyPoints: 5,
   }, 201);
+  const invalidPoints = await request.post(`${api}/projects/${project.id}/tasks`, {
+    headers: member.headers,
+    data: { title: "Invalid estimate", description: "", taskType: "TASK", priority: "MEDIUM", storyPoints: -1 },
+  });
+  expect(invalidPoints.status()).toBe(400);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const pastDueTask = await request.post(`${api}/projects/${project.id}/tasks`, {
+    headers: member.headers,
+    data: { title: "Past due", description: "", taskType: "TASK", priority: "MEDIUM", dueDate: yesterday.toISOString().slice(0, 10) },
+  });
+  expect(pastDueTask.status()).toBe(400);
+  const memberDeleteDenied = await request.delete(`${api}/projects/${project.id}/tasks/${createdTask.id}?version=${createdTask.version}`, { headers: member.headers });
+  expect(memberDeleteDenied.status()).toBe(403);
+  const missingVersion = await request.patch(`${api}/projects/${project.id}/tasks/${createdTask.id}/status`, {
+    headers: member.headers, data: { status: "IN_PROGRESS" },
+  });
+  expect(missingVersion.status()).toBe(400);
   const subtask = await data(request, "POST", `/projects/${project.id}/tasks`, member, {
     title: "Child implementation", description: "", taskType: "SUBTASK", priority: "MEDIUM", parentTaskId: createdTask.id,
   }, 201);
@@ -159,6 +190,10 @@ test("quy trﾃｬnh workspace, d盻ｱ ﾃ｡n, phﾃ｢n quy盻］, task vﾃ cﾃ｡c module nghi盻
     headers: member.headers, data: { name: "Denied sprint", startDate: "2026-11-01", endDate: "2026-11-14" },
   });
   expect(sprintDenied.status()).toBe(403);
+  const invalidSprintDates = await request.post(`${api}/projects/${project.id}/sprints`, {
+    headers: admin.headers, data: { name: "Invalid dates", startDate: "2026-11-14", endDate: "2026-11-01" },
+  });
+  expect(invalidSprintDates.status()).toBe(400);
   const sprint = await data(request, "POST", `/projects/${project.id}/sprints`, admin, {
     name: "Release sprint", goal: "Ship the feature", startDate: "2026-11-01", endDate: "2026-11-14",
   }, 201);
@@ -182,6 +217,18 @@ test("quy trﾃｬnh workspace, d盻ｱ ﾃ｡n, phﾃ｢n quy盻］, task vﾃ cﾃ｡c module nghi盻
   const assignment = notifications.find((item) => item.type === "TASK_ASSIGNED");
   expect(assignment).toBeTruthy();
   await data(request, "PATCH", `/notifications/${assignment.id}/read`, contributor);
+  const readAssignment = (await data(request, "GET", "/notifications", contributor)).find((item) => item.id === assignment.id);
+  expect(readAssignment.readAt).toBeTruthy();
+  const otherUserNotification = await request.patch(`${api}/notifications/${assignment.id}/read`, { headers: member.headers });
+  expect([403, 404]).toContain(otherUserNotification.status());
+
+  const mentionedComment = await data(request, "POST", `/projects/${project.id}/tasks/${taskForSprint.id}/comments`, owner, {
+    body: `Please review @${contributor.email}`,
+  }, 201);
+  expect(mentionedComment.id).toBeTruthy();
+  const mention = (await data(request, "GET", "/notifications", contributor)).find((item) => item.type === "COMMENT_MENTION");
+  expect(mention).toBeTruthy();
+  expect(mention.body).toContain(contributor.email);
   expect((await data(request, "GET", `/projects/${project.id}/reports/overview`, owner)).totalTasks).toBeGreaterThan(0);
   expect((await data(request, "GET", `/projects/${project.id}/reports`, owner)).bugSeverity).toBeDefined();
   expect((await data(request, "GET", `/projects/${project.id}/activity`, owner)).length).toBeGreaterThan(0);
@@ -197,4 +244,6 @@ test("quy trﾃｬnh workspace, d盻ｱ ﾃ｡n, phﾃ｢n quy盻］, task vﾃ cﾃ｡c module nghi盻
   await data(request, "PATCH", `/projects/${project.id}/restore`, owner);
   await data(request, "PATCH", `/workspaces/${workspace.id}/archive`, owner);
   expect((await data(request, "GET", "/workspaces/archived", owner)).some((item) => item.id === workspace.id)).toBe(true);
+  await data(request, "PATCH", `/workspaces/${workspace.id}/restore`, owner);
+  expect((await data(request, "GET", "/workspaces", owner)).some((item) => item.id === workspace.id)).toBe(true);
 });

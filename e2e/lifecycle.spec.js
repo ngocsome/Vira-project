@@ -27,7 +27,8 @@ async function task(request, context, title = "E2E task") {
   }));
 }
 
-test("reset email, upload/download và archive/restore hoạt động qua API Docker", async ({ request }) => {
+test("reset mật khẩu qua UI, upload/download và archive/restore hoạt động qua Docker", async ({ request, page }) => {
+  test.skip(test.info().project.name === "mobile-chrome", "Các endpoint API được chạy một lần trong suite.");
   const owner = await seed(request, "lifecycle-owner");
   const work = await task(request, owner);
 
@@ -43,8 +44,11 @@ test("reset email, upload/download và archive/restore hoạt động qua API Do
   const source = await sourceResponse.json();
   const token = (source.Text || source.HTML || "").match(/token=([A-Za-z0-9_-]+)/)?.[1];
   expect(token).toBeTruthy();
-  const reset = await request.post(`${api}/auth/reset-password`, { data: { token, newPassword: "ResetPass@12345" } });
-  expect(reset.status()).toBe(200);
+  await page.goto(`/?token=${encodeURIComponent(token)}`);
+  await expect(page.getByRole("heading", { name: "Đặt lại mật khẩu" })).toBeVisible();
+  await page.getByLabel("Mật khẩu").fill("ResetPass@12345");
+  await page.getByRole("button", { name: "Đặt lại mật khẩu" }).click();
+  await expect(page.getByText("Đặt lại mật khẩu thành công. Hãy đăng nhập.")).toBeVisible();
   const relogin = await request.post(`${api}/auth/login`, { data: { email: owner.email, password: "ResetPass@12345" } });
   expect(relogin.status()).toBe(200);
 
@@ -73,6 +77,7 @@ test("reset email, upload/download và archive/restore hoạt động qua API Do
 });
 
 test("IDOR bị chặn giữa workspace độc lập và collaboration có quyền truy cập", async ({ request }) => {
+  test.skip(test.info().project.name === "mobile-chrome", "Các endpoint API được chạy một lần trong suite.");
   const owner = await seed(request, "idor-owner");
   const outsider = await seed(request, "idor-outsider");
   const work = await task(request, owner, "Private task");

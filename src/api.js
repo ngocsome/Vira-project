@@ -19,6 +19,8 @@ export async function request(path, { method = "GET", token, body } = {}) {
 
   const payload = await response.json().catch(() => null);
 
+  if (response.status === 204) return null;
+
   if (!response.ok || !payload?.success) {
     if (response.status === 401) {
       localStorage.removeItem("vira.session");
@@ -131,6 +133,11 @@ export const viraApi = {
         token,
       },
     ),
+  deleteTask: (token, projectId, taskId, version) =>
+    request(`/projects/${projectId}/tasks/${taskId}?version=${version}`, {
+      method: "DELETE",
+      token,
+    }),
   searchTasks: (token, projectId, filters) => {
     const query = new URLSearchParams(
       Object.entries(filters).filter(

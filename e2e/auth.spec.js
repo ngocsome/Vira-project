@@ -30,8 +30,9 @@ test("đăng nhập và vào workspace demo", async ({ page }) => {
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Mật khẩu").fill(user.password);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
+  if (test.info().project.name === "mobile-chrome") await page.locator(".menu-btn").click();
   await expect(page.getByText("Tổng quan").first()).toBeVisible();
-  await expect(page.getByRole("complementary").getByText(user.workspaceName)).toBeVisible();
+  await expect(page.getByText(user.workspaceName, { exact: true }).first()).toBeVisible();
 });
 
 test("mở được luồng quên mật khẩu", async ({ page }) => {

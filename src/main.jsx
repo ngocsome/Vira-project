@@ -569,6 +569,7 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
   const [draggedId, setDraggedId] = useState(null);
   const [visible, setVisible] = useState(tasks);
   const [savedFilters, setSavedFilters] = useState([]);
+  const [activeSavedFilter, setActiveSavedFilter] = useState(null);
   const [filterName, setFilterName] = useState("");
   const filters = { q: query, status: statusFilter, priority: priorityFilter };
   const loadFilters = useCallback(async () => {
@@ -600,11 +601,21 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
   const applyFilter = (saved) => {
     try {
       const next = JSON.parse(saved.filters);
+      setActiveSavedFilter(saved.id);
       setQuery(next.q || "");
       setStatusFilter(next.status || "");
       setPriorityFilter(next.priority || "");
     } catch {
       /* invalid historical filter is ignored */
+    }
+  };
+  const deleteFilter = async (saved) => {
+    try {
+      await viraApi.deleteTaskFilter(token, projectId, saved.id);
+      setSavedFilters((current) => current.filter((item) => item.id !== saved.id));
+      if (activeSavedFilter === saved.id) setActiveSavedFilter(null);
+    } catch {
+      /* Keep the saved filter visible when deletion fails. */
     }
   };
   const saveFilter = async () => {
@@ -638,13 +649,19 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
         <Search size={18} />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setActiveSavedFilter(null);
+            setQuery(event.target.value);
+          }}
           aria-label="Tìm kiếm công việc"
           placeholder="Tìm theo mã hoặc tiêu đề..."
         />
         <select
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
+          onChange={(event) => {
+            setActiveSavedFilter(null);
+            setStatusFilter(event.target.value);
+          }}
           aria-label="Lọc theo trạng thái"
         >
           <option value="">Mọi trạng thái</option>
@@ -656,7 +673,10 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
         </select>
         <select
           value={priorityFilter}
-          onChange={(event) => setPriorityFilter(event.target.value)}
+          onChange={(event) => {
+            setActiveSavedFilter(null);
+            setPriorityFilter(event.target.value);
+          }}
           aria-label="Lọc theo ưu tiên"
         >
           <option value="">Mọi ưu tiên</option>
@@ -670,13 +690,24 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
       <div className="saved-filter-bar" aria-label="Bộ lọc đã lưu">
         <span>Bộ lọc đã lưu</span>
         {savedFilters.map((saved) => (
-          <button
-            key={saved.id}
-            className="filter-chip"
-            onClick={() => applyFilter(saved)}
-          >
-            {saved.name}
-          </button>
+          <span className="saved-filter-chip" key={saved.id}>
+            <button
+              className="filter-chip"
+              aria-pressed={activeSavedFilter === saved.id}
+              onClick={() => applyFilter(saved)}
+            >
+              {saved.name}
+            </button>
+            <button
+              type="button"
+              className="filter-chip-delete"
+              aria-label={`Xóa bộ lọc ${saved.name}`}
+              title={`Xóa bộ lọc ${saved.name}`}
+              onClick={() => deleteFilter(saved)}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </span>
         ))}
         <input
           value={filterName}
@@ -1180,6 +1211,7 @@ function TaskDetails({
   sprints,
   tasks,
   refreshTask,
+  deleteTask,
 }) {
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
@@ -1392,6 +1424,13 @@ function TaskDetails({
             >
               <Bell size={15} />
               {collaboration.currentUserWatching ? "Đang theo dõi" : "Theo dõi"}
+            </button>
+          </div>
+        )}
+        {isAdmin && (
+          <div className="task-collaboration-actions">
+            <button className="btn secondary danger-button" onClick={() => deleteTask(task)}>
+              Xóa công việc
             </button>
           </div>
         )}
@@ -3469,6 +3508,17 @@ function App() {
       setError(errorText(err));
     }
   };
+  const deleteTask = async (task) => {
+    if (!window.confirm(`Xóa công việc “${task.title}”? Bạn có thể khôi phục trong Cài đặt dự án.`)) return;
+    try {
+      await viraApi.deleteTask(session.accessToken, project.id, task.id, task.version);
+      setTasks((current) => current.filter((item) => item.id !== task.id));
+      setSelected(null);
+      setOverview(await viraApi.overview(session.accessToken, project.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
   const moveTask = async (taskId, targetStatusOrPosition, maybePosition) => {
     const task = tasks.find((item) => String(item.id) === String(taskId));
     if (!task) return;
@@ -3583,6 +3633,8 @@ function App() {
           selectProject={async (item) => {
             setProject(item);
             localStorage.setItem("vira.projectId", String(item.id));
+            setPage("Tổng quan");
+            setSelected(null);
             await loadProject(session.accessToken, item);
           }}
           switchWorkspace={() => {
@@ -3714,10 +3766,16 @@ function App() {
           onSelectProject={async (p) => {
             setProject(p);
             localStorage.setItem("vira.projectId", String(p.id));
+            setPage("Tổng quan");
+            setSelected(null);
+            setMobile(false);
             await loadProject(session.accessToken, p);
           }}
           onSelectWorkspace={async (ws) => {
             await chooseWorkspace(ws);
+            setPage("Tổng quan");
+            setSelected(null);
+            setMobile(false);
           }}
           onOpenCreateProject={() => setCreateProjectModalOpen(true)}
           onOpenCreateWorkspace={() => setCreateWorkspaceModalOpen(true)}
@@ -3743,12 +3801,12 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           {isAdmin && (
-            <button onClick={() => setPage("Cài đặt dự án")}>
+            <button onClick={() => { setPage("Cài đặt dự án"); setMobile(false); }}>
               <FolderKanban size={18} />
               {project.projectKey}
             </button>
           )}
-          <button onClick={() => setPage("Hồ sơ")}>
+          <button onClick={() => { setPage("Hồ sơ"); setMobile(false); }}>
             <Settings size={18} />
             Hồ sơ cá nhân
           </button>
@@ -3869,6 +3927,7 @@ function App() {
           const freshTask = freshTasks.find((item) => item.id === taskId);
           if (freshTask) setSelected(freshTask);
         }}
+        deleteTask={deleteTask}
       />
       {creating && (
         <TaskForm

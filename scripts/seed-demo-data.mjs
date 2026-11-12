@@ -128,12 +128,14 @@ async function main() {
   let taskId = existingTask?.id;
 
   if (!existingTask) {
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 7);
     const createTaskRes = await post(`/projects/${project.id}/tasks`, {
       title: "Thiết kế màn hình đăng nhập",
       description: "Thiết kế desktop và mobile cho toàn bộ màn hình xác thực, Kanban, và chi tiết task.",
       taskType: "TASK",
       priority: "HIGH",
-      dueDate: "2026-10-15",
+      dueDate: dueDate.toISOString().slice(0, 10),
       estimatedHours: 8,
       storyPoints: 3,
     }, token);
