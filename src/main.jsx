@@ -23,11 +23,13 @@ import {
   MoreHorizontal,
   PanelsTopLeft,
   Paperclip,
+  Pencil,
   Pin,
   Plus,
   Save,
   Search,
   Settings,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -125,9 +127,82 @@ function Empty({ message }) {
     </div>
   );
 }
+/**
+ * Splits tasks into top-level items and subtasks keyed by parent id.
+ * A subtask only nests when its parent is part of `tasks`; otherwise it stays
+ * top-level so it never disappears from a filtered list.
+ */
+const groupSubtasks = (tasks) => {
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const subtasksByParent = new Map();
+  const roots = [];
+  tasks.forEach((task) => {
+    if (!task.parentTaskId || !taskIds.has(task.parentTaskId)) {
+      roots.push(task);
+      return;
+    }
+    const siblings = subtasksByParent.get(task.parentTaskId) || [];
+    subtasksByParent.set(task.parentTaskId, [...siblings, task]);
+  });
+  return { roots, subtasksByParent };
+};
+const indexTasksById = (tasks) =>
+  new Map(tasks.map((task) => [task.id, task]));
+function SubtaskStatusBadge({ status }) {
+  return (
+    <span className={`subtask-status status-${status.toLowerCase()}`}>
+      {STATUS[status]?.[0] || status}
+    </span>
+  );
+}
+function ParentMarker({ parent }) {
+  if (!parent) return null;
+  return (
+    <span className="parent-marker" title={`Thuộc ${parent.taskCode} · ${parent.title}`}>
+      ↳ {parent.taskCode}
+    </span>
+  );
+}
+function CardSubtasks({ subtasks, open }) {
+  const [expanded, setExpanded] = useState(false);
+  const doneCount = subtasks.filter((item) => item.status === "DONE").length;
+  const stop = (event) => event.stopPropagation();
+  return (
+    <div className="card-subtasks" onClick={stop} onKeyDown={stop}>
+      <button
+        type="button"
+        className="subtask-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {doneCount}/{subtasks.length} việc con
+      </button>
+      {expanded && (
+        <div className="card-subtask-list">
+          {subtasks.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className="card-subtask"
+              onClick={() => open(item)}
+            >
+              <span className="card-subtask-title">
+                <b>{item.taskCode}</b> {item.title}
+              </span>
+              <SubtaskStatusBadge status={item.status} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 function TaskCard({
   task,
   open,
+  subtasks = [],
+  parent = null,
   draggable = false,
   isDragging = false,
   isDragOver = false,
@@ -178,7 +253,9 @@ function TaskCard({
       </div>
       <h4>{task.title}</h4>
       <div className="task-id">
-        <span>{task.taskCode}</span>
+        <span>
+          {task.taskCode} <ParentMarker parent={parent} />
+        </span>
         <span
           className={`priority ${task.priority === "URGENT" ? "urgent" : task.priority === "HIGH" ? "high" : ""}`}
         >
@@ -193,6 +270,7 @@ function TaskCard({
         </span>
         <span className="task-status-inline">{status}</span>
       </div>
+      {subtasks.length > 0 && <CardSubtasks subtasks={subtasks} open={open} />}
     </div>
   );
 }
@@ -409,6 +487,8 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUs
         position: index + 1,
         wipLimit: null,
       }));
+  const { roots, subtasksByParent } = groupSubtasks(tasks);
+  const tasksById = indexTasksById(tasks);
 
   return (
     <section className="board-wrap">
@@ -449,7 +529,7 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUs
         {displayColumns.map((column) => {
           const status = column.taskStatus;
           const [, color] = STATUS[status] || [column.name, "slate"];
-          const items = tasks.filter((task) => task.status === status);
+          const items = roots.filter((task) => task.status === status);
           const overWip = column.wipLimit && items.length > column.wipLimit;
           return (
             <div
@@ -487,6 +567,8 @@ function Board({ tasks, open, create, move, token, projectId, isAdmin, currentUs
                     task={task}
                     key={task.id}
                     open={open}
+                    subtasks={subtasksByParent.get(task.id)}
+                    parent={tasksById.get(task.parentTaskId)}
                     draggable={canEditTaskAs(task, currentUserId, isAdmin)}
                     isDragging={draggedTaskId === task.id}
                     isDragOver={dragOverTaskId === task.id}
@@ -562,6 +644,42 @@ function WipColumnEditor({ column, save }) {
     </form>
   );
 }
+function BacklogRow({ task, nested, parent, draggable, onDragStart, onDrop, open }) {
+  return (
+    <button
+      className={`backlog-row ${nested ? "subtask-row" : ""}`}
+      draggable={draggable}
+      onDragStart={() => {
+        if (draggable) onDragStart();
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={onDrop}
+      onClick={() => open(task)}
+    >
+      <span className="drag" aria-hidden="true">
+        {nested ? <ChevronRight size={16} /> : <GripVertical size={18} />}
+      </span>
+      <span className={`type ${task.taskType === "BUG" ? "bug" : ""}`}>
+        {TYPE[task.taskType]}
+      </span>
+      <b>{task.taskCode}</b>
+      <strong>
+        {task.title} <ParentMarker parent={parent} />
+      </strong>
+      {nested ? (
+        <SubtaskStatusBadge status={task.status} />
+      ) : (
+        <span
+          className={`priority ${task.priority === "URGENT" ? "urgent" : task.priority === "HIGH" ? "high" : ""}`}
+        >
+          <Flag size={12} />
+          {PRIORITY[task.priority]}
+        </span>
+      )}
+      <span className="points">{task.storyPoints || 0} SP</span>
+    </button>
+  );
+}
 function Backlog({ tasks, open, create, move, token, projectId, isAdmin, currentUserId }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -632,6 +750,25 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
       /* API errors are shown by the next application load */
     }
   };
+  const { roots: backlogRoots, subtasksByParent: backlogSubtasks } =
+    groupSubtasks(visible);
+  const allTasksById = indexTasksById(tasks);
+  const dropOn = (task) => {
+    if (draggedId && draggedId !== task.id) move(draggedId, task.position);
+    setDraggedId(null);
+  };
+  const renderRow = (task, { nested = false, parent = null } = {}) => (
+    <BacklogRow
+      key={task.id}
+      task={task}
+      nested={nested}
+      parent={parent}
+      draggable={canEditTaskAs(task, currentUserId, isAdmin)}
+      onDragStart={() => setDraggedId(task.id)}
+      onDrop={() => dropOn(task)}
+      open={open}
+    />
+  );
   return (
     <section>
       <div className="page-head">
@@ -732,38 +869,13 @@ function Backlog({ tasks, open, create, move, token, projectId, isAdmin, current
             <span>{visible.length} công việc</span>
           </div>
         </div>
-        {visible.map((task) => (
-          <button
-            className="backlog-row"
-            key={task.id}
-            draggable={canEditTaskAs(task, currentUserId, isAdmin)}
-            onDragStart={() => {
-              if (canEditTaskAs(task, currentUserId, isAdmin)) setDraggedId(task.id);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => {
-              if (draggedId && draggedId !== task.id)
-                move(draggedId, task.position);
-              setDraggedId(null);
-            }}
-            onClick={() => open(task)}
-          >
-            <span className="drag" aria-hidden="true">
-              <GripVertical size={18} />
-            </span>
-            <span className={`type ${task.taskType === "BUG" ? "bug" : ""}`}>
-              {TYPE[task.taskType]}
-            </span>
-            <b>{task.taskCode}</b>
-            <strong>{task.title}</strong>
-            <span
-              className={`priority ${task.priority === "URGENT" ? "urgent" : task.priority === "HIGH" ? "high" : ""}`}
-            >
-              <Flag size={12} />
-              {PRIORITY[task.priority]}
-            </span>
-            <span className="points">{task.storyPoints || 0} SP</span>
-          </button>
+        {backlogRoots.map((task) => (
+          <React.Fragment key={task.id}>
+            {renderRow(task, { parent: allTasksById.get(task.parentTaskId) })}
+            {(backlogSubtasks.get(task.id) || []).map((subtask) =>
+              renderRow(subtask, { nested: true }),
+            )}
+          </React.Fragment>
         ))}
         {!visible.length && (
           <Empty message="Không tìm thấy công việc phù hợp." />
@@ -1200,6 +1312,163 @@ function TaskModal({ task, close, update }) {
     </div>
   );
 }
+const toEditableDetails = (task) => ({
+  title: task.title || "",
+  description: task.description || "",
+  taskType: task.taskType,
+  priority: task.priority,
+  dueDate: task.dueDate || "",
+  estimatedHours: task.estimatedHours ?? "",
+  storyPoints: task.storyPoints ?? "",
+});
+const toUpdatePayload = (form) => ({
+  title: form.title.trim(),
+  description: form.description.trim() || null,
+  taskType: form.taskType,
+  priority: form.priority,
+  dueDate: form.dueDate || null,
+  estimatedHours: form.estimatedHours === "" ? null : Number(form.estimatedHours),
+  storyPoints: form.storyPoints === "" ? null : Number(form.storyPoints),
+});
+function TaskEditForm({ task, save, cancel }) {
+  const [form, setForm] = useState(() => toEditableDetails(task));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const change = (event) =>
+    setForm({ ...form, [event.target.name]: event.target.value });
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.title.trim()) {
+      setError("Tiêu đề công việc là bắt buộc");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await save(toUpdatePayload(form));
+    } catch (err) {
+      setError(errorText(err));
+      setSaving(false);
+    }
+  };
+  return (
+    <form className="form-modal task-edit-form" onSubmit={submit} aria-label="Chỉnh sửa công việc">
+      {error && <p className="form-error">{error}</p>}
+      <label>
+        Tiêu đề
+        <input required name="title" value={form.title} onChange={change} maxLength={500} />
+      </label>
+      <label>
+        Mô tả
+        <textarea name="description" value={form.description} onChange={change} />
+      </label>
+      <div className="form-grid">
+        <label>
+          Loại
+          <select name="taskType" value={form.taskType} onChange={change}>
+            {Object.entries(TYPE).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Ưu tiên
+          <select name="priority" value={form.priority} onChange={change}>
+            {Object.entries(PRIORITY).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Hạn hoàn thành
+          <input type="date" name="dueDate" value={form.dueDate} onChange={change} />
+        </label>
+        <label>
+          Story point
+          <input type="number" min="0" name="storyPoints" value={form.storyPoints} onChange={change} />
+        </label>
+        <label>
+          Ước lượng giờ
+          <input type="number" min="0.1" step="0.1" name="estimatedHours" value={form.estimatedHours} onChange={change} />
+        </label>
+      </div>
+      <div className="task-edit-actions">
+        <button type="button" className="btn secondary" onClick={cancel} disabled={saving}>
+          Hủy
+        </button>
+        <button className="btn primary" disabled={saving}>
+          <Save size={15} />
+          {saving ? "Đang lưu..." : "Lưu thay đổi"}
+        </button>
+      </div>
+    </form>
+  );
+}
+function SubtaskSection({ subtasks, canCreate, canDelete, createSubtask, deleteSubtask, open }) {
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      await createSubtask(title.trim());
+      setTitle("");
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const doneCount = subtasks.filter((item) => item.status === "DONE").length;
+  return (
+    <section className="subtask-section" aria-label="Công việc con">
+      <h3>
+        Công việc con ({doneCount}/{subtasks.length})
+      </h3>
+      {error && <p className="form-error">{error}</p>}
+      <div className="subtask-list">
+        {subtasks.map((item) => (
+          <div className="subtask-item" key={item.id}>
+            <button className="subtask-open" onClick={() => open(item)}>
+              <span className="issue-key">{item.taskCode}</span>
+              <span className="subtask-title">{item.title}</span>
+              <span className={`subtask-status status-${item.status.toLowerCase()}`}>
+                {STATUS[item.status]?.[0] || item.status}
+              </span>
+            </button>
+            {canDelete && (
+              <button
+                className="icon-btn compact-icon"
+                aria-label={`Xóa công việc con ${item.taskCode}`}
+                onClick={() => deleteSubtask(item)}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+        {!subtasks.length && <p className="muted-text">Chưa có công việc con.</p>}
+      </div>
+      {canCreate && (
+        <form className="subtask-form" onSubmit={submit}>
+          <input
+            aria-label="Tiêu đề công việc con"
+            placeholder="Thêm công việc con…"
+            value={title}
+            maxLength={500}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+          <button className="btn secondary" disabled={saving || !title.trim()}>
+            <Plus size={14} /> Thêm
+          </button>
+        </form>
+      )}
+    </section>
+  );
+}
 function TaskDetails({
   task,
   close,
@@ -1212,7 +1481,11 @@ function TaskDetails({
   tasks,
   refreshTask,
   deleteTask,
+  saveTaskDetails,
+  createSubtask,
+  open,
 }) {
+  const [editing, setEditing] = useState(false);
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [collaboration, setCollaboration] = useState(null);
@@ -1275,6 +1548,22 @@ function TaskDetails({
   }, [load]);
   if (!task) return null;
   const canEditTask = canEditTaskAs(task, currentUserId, isAdmin);
+  const parentTask = task.parentTaskId
+    ? tasks.find((item) => item.id === task.parentTaskId)
+    : null;
+  const subtasks = tasks.filter((item) => item.parentTaskId === task.id);
+  const canDeleteTask = task.parentTaskId
+    ? canEditTaskAs(parentTask, currentUserId, isAdmin)
+    : isAdmin;
+  const saveDetails = async (details) => {
+    try {
+      await saveTaskDetails(task, details);
+      setEditing(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) await refreshTask(task.id);
+      throw err;
+    }
+  };
   const addComment = async () => {
     if (!comment.trim()) return;
     try {
@@ -1393,7 +1682,32 @@ function TaskDetails({
             <X size={20} />
           </button>
         </div>
-        <h2>{task.title}</h2>
+        {editing ? (
+          <TaskEditForm
+            key={`${task.id}-${task.version}`}
+            task={task}
+            save={saveDetails}
+            cancel={() => setEditing(false)}
+          />
+        ) : (
+          <div className="task-title-row">
+            <h2>{task.title}</h2>
+            {canEditTask && (
+              <button className="btn secondary" onClick={() => setEditing(true)}>
+                <Pencil size={14} />
+                Chỉnh sửa
+              </button>
+            )}
+          </div>
+        )}
+        {parentTask && (
+          <p className="parent-ref">
+            Thuộc công việc{" "}
+            <button className="link-button" onClick={() => open(parentTask)}>
+              {parentTask.taskCode} · {parentTask.title}
+            </button>
+          </p>
+        )}
         {error && <p className="form-error">{error}</p>}
         {collaboration && (
           <div className="task-collaboration-actions">
@@ -1427,17 +1741,28 @@ function TaskDetails({
             </button>
           </div>
         )}
-        {isAdmin && (
+        {canDeleteTask && (
           <div className="task-collaboration-actions">
             <button className="btn secondary danger-button" onClick={() => deleteTask(task)}>
-              Xóa công việc
+              <Trash2 size={15} />
+              {task.parentTaskId ? "Xóa công việc con" : "Xóa công việc"}
             </button>
           </div>
         )}
         <div className="modal-content">
           <div className="description">
             <h3>Mô tả</h3>
-            <p>{task.description || "Công việc chưa có mô tả."}</p>
+            <p className="description-text">{task.description || "Công việc chưa có mô tả."}</p>
+            {!task.parentTaskId && (
+              <SubtaskSection
+                subtasks={subtasks}
+                canCreate
+                canDelete={canEditTask}
+                createSubtask={(title) => createSubtask(task, title)}
+                deleteSubtask={deleteTask}
+                open={open}
+              />
+            )}
             <h3>Bình luận</h3>
             <div className="comment-box">
               <input
@@ -1758,6 +2083,22 @@ function TaskDetails({
                 <Flag size={13} />
                 {PRIORITY[task.priority]}
               </p>
+            </div>
+            <div>
+              <span>Loại</span>
+              <p data-testid="task-type">{TYPE[task.taskType] || task.taskType}</p>
+            </div>
+            <div>
+              <span>Hạn hoàn thành</span>
+              <p>{dateText(task.dueDate)}</p>
+            </div>
+            <div>
+              <span>Story point</span>
+              <p>{task.storyPoints ?? 0} điểm</p>
+            </div>
+            <div>
+              <span>Ước lượng</span>
+              <p>{task.estimatedHours ? `${task.estimatedHours} giờ` : "Chưa ước lượng"}</p>
             </div>
           </aside>
         </div>
@@ -3508,12 +3849,41 @@ function App() {
       setError(errorText(err));
     }
   };
+  const saveTaskDetails = async (task, details) => {
+    const next = await viraApi.updateTask(session.accessToken, project.id, task.id, {
+      ...details,
+      version: task.version,
+    });
+    setTasks((current) => current.map((item) => (item.id === next.id ? next : item)));
+    setSelected(next);
+    setOverview(await viraApi.overview(session.accessToken, project.id));
+  };
+  const createSubtask = async (parentTask, title) => {
+    const subtask = await viraApi.createTask(session.accessToken, project.id, {
+      title,
+      taskType: "SUBTASK",
+      priority: parentTask.priority,
+      parentTaskId: parentTask.id,
+    });
+    setTasks((current) => [...current, subtask]);
+    setOverview(await viraApi.overview(session.accessToken, project.id));
+  };
   const deleteTask = async (task) => {
-    if (!window.confirm(`Xóa công việc “${task.title}”? Bạn có thể khôi phục trong Cài đặt dự án.`)) return;
+    const kind = task.parentTaskId ? "công việc con" : "công việc";
+    const cascadeNote = task.parentTaskId
+      ? ""
+      : " Các công việc con cũng sẽ bị xóa theo.";
+    if (!window.confirm(`Xóa ${kind} “${task.title}”?${cascadeNote} Bạn có thể khôi phục trong Cài đặt dự án.`)) return;
     try {
       await viraApi.deleteTask(session.accessToken, project.id, task.id, task.version);
-      setTasks((current) => current.filter((item) => item.id !== task.id));
-      setSelected(null);
+      // Reload the full list: deleting a parent task also soft-deletes its subtasks.
+      const freshTasks = await viraApi.tasks(session.accessToken, project.id);
+      setTasks(freshTasks);
+      setSelected((current) =>
+        current && current.id !== task.id
+          ? freshTasks.find((item) => item.id === current.id) ?? null
+          : null,
+      );
       setOverview(await viraApi.overview(session.accessToken, project.id));
     } catch (err) {
       setError(errorText(err));
@@ -3912,7 +4282,11 @@ function App() {
         </main>
       </div>
       <TaskDetails
+        key={selected?.id ?? "none"}
         task={selected}
+        open={setSelected}
+        saveTaskDetails={saveTaskDetails}
+        createSubtask={createSubtask}
         close={() => setSelected(null)}
         update={update}
         token={session.accessToken}

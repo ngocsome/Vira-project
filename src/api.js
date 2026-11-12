@@ -221,6 +221,12 @@ export const viraApi = {
       token,
       body: task,
     }),
+  updateTask: (token, projectId, taskId, details) =>
+    request(`/projects/${projectId}/tasks/${taskId}`, {
+      method: "PATCH",
+      token,
+      body: details,
+    }),
   updateTaskStatus: (token, projectId, taskId, change) =>
     request(`/projects/${projectId}/tasks/${taskId}/status`, {
       method: "PATCH",

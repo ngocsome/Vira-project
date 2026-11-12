@@ -1,8 +1,10 @@
 package vn.vira.task.application;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,6 +25,7 @@ import vn.vira.task.api.TaskResponse;
 import vn.vira.task.api.TaskPageResponse;
 import vn.vira.task.api.SavedFilterRequest;
 import vn.vira.task.api.SavedFilterResponse;
+import vn.vira.task.api.UpdateTaskRequest;
 import vn.vira.task.domain.ProjectTaskCounter;
 import vn.vira.task.domain.ProjectTaskCounterRepository;
 import vn.vira.task.domain.SavedTaskFilter;
@@ -62,10 +65,7 @@ public class TaskService {
         User reporter = userRepository.findById(currentUser.id())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
         Task parentTask = findParent(projectId, request.parentTaskId());
-
-        if (request.dueDate() != null && request.dueDate().isBefore(java.time.LocalDate.now())) {
-            throw new BusinessException("Hạn hoàn thành không được là ngày trong quá khứ");
-        }
+        assertDueDateNotPast(request.dueDate());
 
         String taskCode = nextTaskCode(project);
         long position = taskRepository.countByProjectIdAndDeletedAtIsNull(projectId) + 1;
@@ -89,6 +89,30 @@ public class TaskService {
         statusHistory.save(new TaskStatusHistory(saved, saved.getStatus()));
         activityLogs.record(saved, "TASK_CREATED", "Tạo công việc");
         return taskMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public TaskResponse update(Long projectId, Long taskId, UpdateTaskRequest request) {
+        projectService.requireMember(projectId);
+        Task task = requireTask(projectId, taskId);
+        taskAuthorizationService.requireTaskEditor(task);
+        assertVersion(task, request.version());
+        if (!Objects.equals(task.getDueDate(), request.dueDate())) {
+            assertDueDateNotPast(request.dueDate());
+        }
+
+        task.updateDetails(
+                request.title().trim(),
+                normalize(request.description()),
+                request.taskType(),
+                request.priority(),
+                request.dueDate(),
+                request.estimatedHours(),
+                request.storyPoints()
+        );
+        activityLogs.record(task, "TASK_UPDATED", "Cập nhật thông tin công việc");
+        taskNotifications.notifyParticipants(task, "TASK_UPDATED", "Task " + task.getTaskCode() + " đã được cập nhật", task.getTitle());
+        return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
     @Transactional(readOnly = true)
@@ -196,16 +220,18 @@ public class TaskService {
 
     @Transactional
     public void softDelete(Long projectId, Long taskId, Long version) {
-        projectService.requireAdmin(projectId);
-        Task task = taskRepository.findByIdAndProjectIdAndDeletedAtIsNull(taskId, projectId)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy công việc"));
+        projectService.requireMember(projectId);
+        Task task = requireTask(projectId, taskId);
+        taskAuthorizationService.requireTaskDeleter(task);
+        assertVersion(task, version);
 
-        if (!task.getVersion().equals(version)) {
-            throw new ObjectOptimisticLockingFailureException(Task.class, taskId);
-        }
-
-        task.setDeletedAt(Instant.now());
+        Instant deletedAt = Instant.now();
+        task.setDeletedAt(deletedAt);
         activityLogs.record(task, "TASK_DELETED", "Xóa mềm công việc");
+        for (Task subtask : taskRepository.findByParentTaskIdAndDeletedAtIsNull(taskId)) {
+            subtask.setDeletedAt(deletedAt);
+            activityLogs.record(subtask, "TASK_DELETED", "Xóa mềm theo công việc cha " + task.getTaskCode());
+        }
     }
 
     @Transactional
@@ -214,8 +240,17 @@ public class TaskService {
         Task task = taskRepository.findByIdAndProjectIdAndDeletedAtIsNotNull(taskId, projectId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy công việc đã xóa"));
         assertVersion(task, version);
+        if (task.isSubtask() && task.getParentTask().isDeleted()) {
+            throw new BusinessException("Hãy khôi phục công việc cha " + task.getParentTask().getTaskCode() + " trước");
+        }
+
+        Instant deletedAt = task.getDeletedAt();
         task.setDeletedAt(null);
         activityLogs.record(task, "TASK_RESTORED", "Khôi phục công việc");
+        for (Task subtask : taskRepository.findByParentTaskIdAndDeletedAt(taskId, deletedAt)) {
+            subtask.setDeletedAt(null);
+            activityLogs.record(subtask, "TASK_RESTORED", "Khôi phục theo công việc cha " + task.getTaskCode());
+        }
         return taskMapper.toResponse(taskRepository.saveAndFlush(task));
     }
 
@@ -224,8 +259,18 @@ public class TaskService {
             return null;
         }
 
-        return taskRepository.findByIdAndProjectIdAndDeletedAtIsNull(parentTaskId, projectId)
+        Task parent = taskRepository.findByIdAndProjectIdAndDeletedAtIsNull(parentTaskId, projectId)
                 .orElseThrow(() -> new BusinessException("Công việc cha không thuộc dự án hiện tại"));
+        if (parent.isSubtask()) {
+            throw new BusinessException("Không thể tạo công việc con cho một công việc con");
+        }
+        return parent;
+    }
+
+    private void assertDueDateNotPast(LocalDate dueDate) {
+        if (dueDate != null && dueDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("Hạn hoàn thành không được là ngày trong quá khứ");
+        }
     }
 
     private Task requireTask(Long projectId, Long taskId) {
