@@ -130,6 +130,28 @@ public class Task extends BaseEntity {
         this.position = position;
     }
 
+    public void updateDetails(
+            String title,
+            String description,
+            TaskType taskType,
+            TaskPriority priority,
+            LocalDate dueDate,
+            BigDecimal estimatedHours,
+            Integer storyPoints
+    ) {
+        this.title = title;
+        this.description = description;
+        this.taskType = taskType;
+        this.priority = priority;
+        this.dueDate = dueDate;
+        this.estimatedHours = estimatedHours;
+        this.storyPoints = storyPoints;
+    }
+
+    public boolean isSubtask() {
+        return parentTask != null;
+    }
+
     public void changeStatus(TaskStatus newStatus) {
         this.status = newStatus;
         this.completedAt = newStatus == TaskStatus.DONE ? Instant.now() : null;

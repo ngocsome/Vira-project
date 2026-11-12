@@ -2914,3 +2914,232 @@ main {
     flex-direction: column;
   }
 }
+
+/* Task editing & subtasks */
+.task-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.task-title-row h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-title-row .btn {
+  flex: 0 0 auto;
+  margin-top: 14px;
+}
+.task-edit-form {
+  margin: 16px 0 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.task-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+.description-text {
+  white-space: pre-wrap;
+}
+.parent-ref {
+  margin: -16px 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.link-button {
+  color: var(--primary);
+  font-weight: 700;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
+.subtask-section {
+  margin: 0 0 8px;
+}
+.subtask-list {
+  display: grid;
+  gap: 6px;
+}
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px 4px 4px 0;
+  background: var(--card);
+}
+.subtask-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+.subtask-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.subtask-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  color: #475569;
+}
+.subtask-status.status-done {
+  background: #dcfce7;
+  color: #15803d;
+}
+.subtask-status.status-in_progress,
+.subtask-status.status-in_review {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.subtask-status.status-blocked {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.subtask-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.subtask-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  font: inherit;
+}
+.muted-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .task-title-row {
+    flex-direction: column;
+  }
+  .task-title-row .btn {
+    margin-top: 0;
+  }
+  .parent-ref {
+    margin-top: 0;
+  }
+}
+
+/* Subtasks grouped under parent on Board & Backlog */
+.parent-marker {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.card-subtasks {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  cursor: default;
+}
+.subtask-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.subtask-toggle:hover {
+  background: #f1f5f9;
+  color: var(--ink);
+}
+.card-subtask-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.card-subtask {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.card-subtask:hover {
+  border-color: #c9d9f1;
+}
+.card-subtask-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-subtask-title b {
+  color: var(--muted);
+}
+.card-subtask .subtask-status {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+.backlog-row.subtask-row {
+  padding-left: 42px;
+  background: #fbfcfe;
+}
+.backlog-row.subtask-row:hover {
+  background: #f3f8ff;
+}
+.backlog-row.subtask-row .drag {
+  color: #94a3b8;
+}
+@media (max-width: 640px) {
+  .backlog-row.subtask-row {
+    padding-left: 30px;
+  }
+}
+.card-subtask[draggable="true"] {
+  cursor: grab;
+}
+.card-subtask.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}

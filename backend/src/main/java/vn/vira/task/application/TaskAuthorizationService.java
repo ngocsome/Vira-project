@@ -21,12 +21,33 @@ public class TaskAuthorizationService {
         Long userId = currentUser.id();
         Long projectId = task.getProject().getId();
 
-        if (isAdmin(projectId, userId)
-                || task.getReporter().getId().equals(userId)
-                || task.getAssignees().stream().anyMatch(user -> user.getId().equals(userId))) {
+        if (isAdmin(projectId, userId) || isReporterOrAssignee(task, userId)) {
             return;
         }
         throw new AccessDeniedException("Bạn chỉ có thể cập nhật công việc được giao hoặc do mình tạo");
+    }
+
+    /**
+     * Root tasks can only be deleted by project admins; a subtask can also be deleted
+     * by anyone allowed to edit its parent task.
+     */
+    @Transactional(readOnly = true)
+    public void requireTaskDeleter(Task task) {
+        Long userId = currentUser.id();
+        Long projectId = task.getProject().getId();
+        if (isAdmin(projectId, userId)) {
+            return;
+        }
+        Task parent = task.getParentTask();
+        if (parent != null && isReporterOrAssignee(parent, userId)) {
+            return;
+        }
+        throw new AccessDeniedException("Bạn không có quyền xóa công việc này");
+    }
+
+    private boolean isReporterOrAssignee(Task task, Long userId) {
+        return task.getReporter().getId().equals(userId)
+                || task.getAssignees().stream().anyMatch(user -> user.getId().equals(userId));
     }
 
     @Transactional(readOnly = true)

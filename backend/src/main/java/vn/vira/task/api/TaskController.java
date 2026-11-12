@@ -57,6 +57,15 @@ public class TaskController {
         return ApiResponse.ok(taskService.create(projectId, request), "Tạo công việc thành công");
     }
 
+    @PatchMapping("/{taskId}")
+    public ApiResponse<TaskResponse> update(
+            @PathVariable Long projectId,
+            @PathVariable Long taskId,
+            @Valid @RequestBody UpdateTaskRequest request
+    ) {
+        return ApiResponse.ok(taskService.update(projectId, taskId, request), "Cập nhật công việc thành công");
+    }
+
     @PatchMapping("/{taskId}/status")
     public ApiResponse<TaskResponse> changeStatus(
             @PathVariable Long projectId,

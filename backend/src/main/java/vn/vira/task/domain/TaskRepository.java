@@ -21,6 +21,10 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
 
     boolean existsByParentTaskIdAndStatusNotAndDeletedAtIsNull(Long parentTaskId, TaskStatus status);
 
+    List<Task> findByParentTaskIdAndDeletedAtIsNull(Long parentTaskId);
+
+    List<Task> findByParentTaskIdAndDeletedAt(Long parentTaskId, java.time.Instant deletedAt);
+
     long countByProjectIdAndStatusAndDeletedAtIsNull(Long projectId, TaskStatus status);
 
     long countByProjectIdAndTaskTypeAndStatusNotAndDeletedAtIsNull(
